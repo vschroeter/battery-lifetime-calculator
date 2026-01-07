@@ -4,40 +4,40 @@ overview: "Implementiert die MUSS-Anforderungen: Batterie-Eingaben, Phasenmodell
 todos:
   - id: add-vuetify
     content: Vuetify integrieren (Dependencies + Plugin) und App-Shell auf Vuetify Layout umstellen.
-    status: pending
+    status: completed
   - id: data-model-store
     content: Pinia Store für Scenario (Battery + Phases + UI defaults) inkl. Default-Preset (ESP32 DeepSleep + Wake).
-    status: pending
+    status: completed
     dependencies:
       - add-vuetify
   - id: units-and-calc
     content: Unit-Konvertierungen und Kernberechnung (mAh/Tag, I_avg, Laufzeit) inkl. DeepSleep-Auto-Restzeit.
-    status: pending
+    status: completed
     dependencies:
       - data-model-store
   - id: validation-warnings
     content: Validierung (Errors) + Warnungen (Dauer>Intervall, aktive Zeit/Tag>24h, optional same-interval sum).
-    status: pending
+    status: completed
     dependencies:
       - units-and-calc
   - id: ui-forms-results
     content: "Vuetify-Form UI: BatteryForm, PhasesEditor (A/B Modus, Einheiten), ResultsPanel (KPIs + Warnungen) mit Live-Update + Berechnen-Button."
-    status: pending
+    status: completed
     dependencies:
       - validation-warnings
   - id: viz-and-sensitivity
     content: "Einfache Visuals ohne Heavy-Libs: PhaseShareDonut, CycleTimeline (Referenz-Intervall), SensitivityBar (±10% Active)."
-    status: pending
+    status: completed
     dependencies:
       - ui-forms-results
   - id: export-json-csv
     content: "Optional: JSON Export der Konfiguration + CSV Export der KPIs per Download."
-    status: pending
+    status: completed
     dependencies:
       - ui-forms-results
   - id: i18n-lite
     content: "DE/EN Vorbereitung: message map + Toggle, Strings zentralisieren."
-    status: pending
+    status: completed
     dependencies:
       - ui-forms-results
 ---
@@ -128,5 +128,3 @@ Store --> Export[export.ts]
 - UI-Komponenten unter `src/components/**`.
 
 ## Teststrategie (manuell, schnell)
-
-- Beispielpreset (ESP32 DeepSleep + Wake) als Default-Daten im Store.
