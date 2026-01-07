@@ -45,6 +45,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     enterConfigAndCalculate: 'Batterie-Konfiguration und Phasen eingeben, dann auf "Berechnen" klicken, um Ergebnisse zu sehen.',
     noPhases: 'Keine aktiven Phasen. Klicken Sie auf "Phase hinzufügen", um eine hinzuzufügen.',
     deepSleepAutoCalculated: 'Dauer wird automatisch als verbleibende Zeit nach allen aktiven Phasen berechnet.',
+    removeAllPhases: 'Alle Phasen entfernen',
   },
   en: {
     appTitle: 'Battery Lifetime Calculator',
@@ -90,6 +91,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     enterConfigAndCalculate: 'Enter battery configuration and phases, then click "Calculate" to see results.',
     noPhases: 'No active phases. Click "Add Phase" to add one.',
     deepSleepAutoCalculated: 'Duration is automatically calculated as the remaining time after all active phases.',
+    removeAllPhases: 'Remove All Phases',
   },
 }
 

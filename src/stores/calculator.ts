@@ -69,6 +69,10 @@ export const useCalculatorStore = defineStore('calculator', () => {
     phases.value = phases.value.filter((p) => p.id !== id)
   }
 
+  function removeAllPhases() {
+    phases.value = phases.value.filter((p) => p.isDeepSleep)
+  }
+
   function resetToESP32Preset() {
     battery.value = {
       capacity_mAh: 1000,
@@ -108,6 +112,7 @@ export const useCalculatorStore = defineStore('calculator', () => {
     addPhase,
     updatePhase,
     removePhase,
+    removeAllPhases,
     resetToESP32Preset,
   }
 })

@@ -5,7 +5,6 @@ import { useLocale } from '@/composables/useLocale'
 import { calculate } from '@/lib/calc'
 import { exportConfigAsJSON, exportResultsAsCSV } from '@/lib/export'
 import PhaseShareDonut from '@/components/Charts/PhaseShareDonut.vue'
-import SensitivityBar from '@/components/SensitivityBar.vue'
 
 const store = useCalculatorStore()
 const { i18n } = useLocale()
@@ -33,13 +32,14 @@ const displayResult = computed(() => {
 </script>
 
 <template>
-  <v-card>
-    <v-card-title class="d-flex justify-space-between align-center flex-wrap ga-2">
-      <span>{{ i18n.t('results') }}</span>
+  <v-card class="modern-card" elevation="1">
+    <v-card-title class="d-flex justify-space-between align-center flex-wrap ga-2 pa-4 pb-2">
+      <span class="text-h6">{{ i18n.t('results') }}</span>
       <div class="d-flex ga-2">
         <v-btn
           color="primary"
           prepend-icon="mdi-calculator"
+          density="compact"
           @click="triggerCalculation"
         >
           {{ i18n.t('calculate') }}
@@ -49,6 +49,8 @@ const displayResult = computed(() => {
             <v-btn
               color="secondary"
               prepend-icon="mdi-download"
+              variant="outlined"
+              density="compact"
               v-bind="menuProps"
             >
               {{ i18n.t('export') }}
@@ -70,7 +72,7 @@ const displayResult = computed(() => {
         </v-menu>
       </div>
     </v-card-title>
-    <v-card-text>
+    <v-card-text class="pa-4 pt-2">
       <div v-if="displayResult">
         <!-- Errors -->
         <v-alert
@@ -104,53 +106,52 @@ const displayResult = computed(() => {
 
         <!-- KPIs -->
         <div v-if="displayResult.errors.length === 0" class="d-flex flex-column ga-3">
-          <v-card variant="outlined" color="primary">
-            <v-card-text>
-              <div class="text-h6 mb-1">{{ i18n.t('averageCurrent') }}</div>
-              <div class="text-h4">
-                {{ displayResult.averageCurrent_mA.toFixed(3) }} mA
-              </div>
-            </v-card-text>
-          </v-card>
+          <div class="d-flex ga-3 flex-wrap">
+            <v-card class="result-tile modern-card flex-grow-1" elevation="1" style="min-width: 200px">
+              <v-card-text class="pa-3">
+                <div class="text-body-2 text-medium-emphasis mb-1">{{ i18n.t('averageCurrent') }}</div>
+                <div class="text-h5 font-weight-medium">
+                  {{ displayResult.averageCurrent_mA.toFixed(3) }} <span class="text-body-1">mA</span>
+                </div>
+              </v-card-text>
+            </v-card>
 
-          <v-card variant="outlined" color="secondary">
-            <v-card-text>
-              <div class="text-h6 mb-1">{{ i18n.t('consumptionPerDay') }}</div>
-              <div class="text-h4">
-                {{ displayResult.totalmAhPerDay.toFixed(2) }} mAh/day
-              </div>
-            </v-card-text>
-          </v-card>
+            <v-card class="result-tile modern-card flex-grow-1" elevation="1" style="min-width: 200px">
+              <v-card-text class="pa-3">
+                <div class="text-body-2 text-medium-emphasis mb-1">{{ i18n.t('consumptionPerDay') }}</div>
+                <div class="text-h5 font-weight-medium">
+                  {{ displayResult.totalmAhPerDay.toFixed(2) }} <span class="text-body-1">mAh/day</span>
+                </div>
+              </v-card-text>
+            </v-card>
+          </div>
 
-          <v-card variant="outlined" color="success">
-            <v-card-text>
-              <div class="text-h6 mb-1">{{ i18n.t('estimatedRuntime') }}</div>
-              <div class="text-h4">
-                {{ displayResult.runtimeDays.toFixed(1) }} {{ i18n.t('days') }}
-                <span class="text-body-2 ml-3">
-                  ({{ displayResult.runtimeWeeks.toFixed(1) }} {{ i18n.t('weeks') }},
-                  {{ displayResult.runtimeMonths.toFixed(1) }} {{ i18n.t('months') }})
-                </span>
+          <v-card class="result-tile modern-card result-tile-emphasized" elevation="1">
+            <v-card-text class="pa-3">
+              <div class="text-body-2 text-medium-emphasis mb-1">{{ i18n.t('estimatedRuntime') }}</div>
+              <div class="text-h4 font-weight-medium mb-1">
+                {{ displayResult.runtimeDays.toFixed(1) }} <span class="text-h6">{{ i18n.t('days') }}</span>
               </div>
-              <!-- <div class="text-caption mt-1 text-medium-emphasis">
-                {{ i18n.t('monthNote') }}
-              </div> -->
+              <div class="text-body-2 text-medium-emphasis">
+                {{ displayResult.runtimeWeeks.toFixed(1) }} {{ i18n.t('weeks') }},
+                {{ displayResult.runtimeMonths.toFixed(1) }} {{ i18n.t('months') }}
+              </div>
             </v-card-text>
           </v-card>
 
           <!-- Phase Breakdown -->
-          <v-card variant="outlined">
-            <v-card-title class="text-subtitle-1">
+          <v-card class="modern-card" elevation="1">
+            <v-card-title class="text-subtitle-1 pa-3 pb-2">
               {{ i18n.t('consumptionByPhase') }}
             </v-card-title>
-            <v-card-text>
-              <v-table density="compact">
+            <v-card-text class="pa-3 pt-2">
+              <v-table density="compact" class="results-table">
                 <thead>
                   <tr>
-                    <th>{{ i18n.t('phase') }}</th>
-                    <th class="text-end">mAh/day</th>
-                    <th class="text-end">{{ i18n.t('eventsPerDay') }}</th>
-                    <th class="text-end">{{ i18n.t('activeTimePerDay') }}</th>
+                    <th class="text-body-2 font-weight-medium">{{ i18n.t('phase') }}</th>
+                    <th class="text-end text-body-2 font-weight-medium">mAh/day</th>
+                    <th class="text-end text-body-2 font-weight-medium">{{ i18n.t('eventsPerDay') }}</th>
+                    <th class="text-end text-body-2 font-weight-medium">{{ i18n.t('activeTimePerDay') }}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -158,14 +159,14 @@ const displayResult = computed(() => {
                     v-for="result in displayResult.phaseResults"
                     :key="result.phaseId"
                   >
-                    <td>{{ result.phaseName }}</td>
-                    <td class="text-end">
+                    <td class="text-body-2">{{ result.phaseName }}</td>
+                    <td class="text-end text-body-2">
                       {{ result.mAhPerDay.toFixed(3) }}
                     </td>
-                    <td class="text-end">
+                    <td class="text-end text-body-2">
                       {{ result.eventsPerDay > 0 ? result.eventsPerDay.toFixed(1) : 'N/A' }}
                     </td>
-                    <td class="text-end">
+                    <td class="text-end text-body-2">
                       {{
                         result.activeTimePerDaySeconds > 0
                           ? (result.activeTimePerDaySeconds / 3600).toFixed(2) + ' h'
@@ -185,12 +186,56 @@ const displayResult = computed(() => {
           </div>
         </div>
       </div>
-      <v-alert v-else type="info" variant="tonal">
+      <v-alert v-else type="info" variant="tonal" density="compact">
         {{ i18n.t('enterConfigAndCalculate') }}
       </v-alert>
     </v-card-text>
   </v-card>
 </template>
 
-<style scoped></style>
+<style scoped>
+.modern-card {
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.result-tile {
+  transition: box-shadow 0.2s ease;
+}
+
+.result-tile:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+.result-tile-emphasized {
+  background: linear-gradient(135deg, rgba(var(--v-theme-success), 0.05) 0%, rgba(var(--v-theme-success), 0.02) 100%);
+}
+
+.results-table :deep(table) {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.results-table :deep(thead th) {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 8px 16px;
+}
+
+.results-table :deep(tbody td) {
+  padding: 8px 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.results-table :deep(tbody tr:last-child td) {
+  border-bottom: none;
+}
+
+/* Responsive: Stack result tiles on small screens */
+@media (max-width: 960px) {
+  .d-flex.flex-wrap > .result-tile {
+    flex-basis: 100% !important;
+    min-width: 100% !important;
+  }
+}
+</style>
 

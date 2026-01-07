@@ -15,10 +15,14 @@ const usablePercent = computed({
   get: () => store.battery.usablePercent,
   set: (value) => store.updateBattery({ usablePercent: value }),
 })
+
+const usableCapacity_mAh = computed(() => {
+  return store.battery.capacity_mAh * (store.battery.usablePercent / 100)
+})
 </script>
 
 <template>
-  <v-form>
+  <v-form class="d-flex flex-column ga-3">
     <v-text-field
       v-model.number="capacity"
       :label="i18n.t('capacity')"
@@ -27,35 +31,40 @@ const usablePercent = computed({
       min="0"
       step="1"
       variant="outlined"
-      density="comfortable"
+      density="compact"
+      hide-details="auto"
     />
 
-    <v-slider
-      v-model="usablePercent"
-      :label="i18n.t('usableCapacity')"
-      min="1"
-      max="100"
-      step="1"
-      thumb-label
-      variant="outlined"
-      density="comfortable"
-      :hint="i18n.t('usableCapacityHint')"
-      persistent-hint
-    >
-      <template #append>
-        <v-text-field
-          v-model.number="usablePercent"
-          type="number"
-          style="width: 80px"
-          density="compact"
-          variant="outlined"
-          hide-details
-          min="1"
-          max="100"
-          step="1"
-        />
-      </template>
-    </v-slider>
+    <div class="d-flex align-center ga-3 flex-wrap">
+      <v-slider
+        v-model="usablePercent"
+        :label="i18n.t('usableCapacity')"
+        min="1"
+        max="100"
+        step="1"
+        thumb-label
+        variant="outlined"
+        density="compact"
+        hide-details
+        class="flex-grow-1"
+        style="min-width: 200px"
+      />
+      <v-text-field
+        v-model.number="usablePercent"
+        type="number"
+        style="width: 90px; flex-shrink: 0"
+        density="compact"
+        variant="outlined"
+        hide-details
+        min="1"
+        max="100"
+        step="1"
+        suffix="%"
+      />
+    </div>
+    <div class="text-caption text-medium-emphasis mt-n2">
+      {{ i18n.t('usableCapacity') }}: {{ usableCapacity_mAh.toFixed(0) }} mAh
+    </div>
   </v-form>
 </template>
 

@@ -21,8 +21,9 @@ const deepSleepPhases = computed(() =>
 )
 
 function addPhase() {
+  const nextPhaseNumber = nonDeepSleepPhases.value.length + 1
   store.addPhase({
-    name: 'New Phase',
+    name: `Phase ${nextPhaseNumber}`,
     isDeepSleep: false,
     current: 10,
     currentUnit: 'mA',
@@ -59,23 +60,16 @@ function handleNameUpdate(id: string, value: string) {
 
 <template>
   <div>
-    <div class="d-flex justify-space-between align-center mb-4">
-      <v-btn color="primary" prepend-icon="mdi-plus" @click="addPhase">
-        {{ i18n.t('addPhase') }}
-      </v-btn>
-    </div>
-
-    <v-divider class="mb-4" />
 
     <!-- DeepSleep Phase (special handling) -->
-    <div v-if="deepSleepPhases.length > 0" class="mb-4">
+    <div v-if="deepSleepPhases.length > 0" class="mb-3">
       <v-card
         v-for="phase in deepSleepPhases"
         :key="phase.id"
-        variant="outlined"
-        color="info"
+        class="phase-card modern-card"
+        elevation="1"
       >
-        <v-card-title class="d-flex align-center ga-2">
+        <v-card-title class="d-flex align-center ga-2 pa-3 pb-2">
           <div
             class="phase-color-indicator"
             :style="{ backgroundColor: getPhaseColor(phase) }"
@@ -101,36 +95,38 @@ function handleNameUpdate(id: string, value: string) {
             @keydown.esc="stopEditing"
           />
         </v-card-title>
-        <v-card-text>
+        <v-card-text class="pa-3 pt-2">
           <div class="d-flex flex-column ga-2">
-            <div class="d-flex ga-2">
+            <div class="d-flex ga-2 align-center">
               <v-text-field
                 :model-value="phase.current"
-                label="Current"
+                :label="i18n.t('current')"
                 type="number"
                 variant="outlined"
-                density="comfortable"
+                density="compact"
+                hide-details="auto"
+                class="flex-grow-1"
                 @update:model-value="
                   updatePhase(phase.id, { current: Number($event) })
                 "
               />
-              <v-select
+              <v-btn-toggle
                 :model-value="phase.currentUnit"
-                :items="[
-                  { title: 'µA', value: 'µA' },
-                  { title: 'mA', value: 'mA' },
-                  { title: 'A', value: 'A' },
-                ]"
-                label="Unit"
                 variant="outlined"
-                density="comfortable"
-                style="max-width: 120px"
+                density="compact"
+                mandatory
+                divided
+                class="unit-toggle"
                 @update:model-value="
                   updatePhase(phase.id, { currentUnit: $event as CurrentUnit })
                 "
-              />
+              >
+                <v-btn value="µA" size="small">µA</v-btn>
+                <v-btn value="mA" size="small">mA</v-btn>
+                <v-btn value="A" size="small">A</v-btn>
+              </v-btn-toggle>
             </div>
-            <v-alert type="info" variant="tonal" density="compact">
+            <v-alert type="info" variant="tonal" density="compact" class="mt-1">
               {{ i18n.t('deepSleepAutoCalculated') }}
             </v-alert>
           </div>
@@ -139,13 +135,14 @@ function handleNameUpdate(id: string, value: string) {
     </div>
 
     <!-- Active Phases -->
-    <div class="d-flex flex-column ga-4">
+    <div class="d-flex flex-column ga-3">
       <v-card
         v-for="phase in nonDeepSleepPhases"
         :key="phase.id"
-        variant="outlined"
+        class="phase-card modern-card"
+        elevation="1"
       >
-        <v-card-title class="d-flex justify-space-between align-center">
+        <v-card-title class="d-flex justify-space-between align-center pa-3 pb-2">
           <div class="d-flex align-center ga-2 flex-grow-1">
             <div
               class="phase-color-indicator"
@@ -177,100 +174,111 @@ function handleNameUpdate(id: string, value: string) {
             variant="text"
             color="error"
             size="small"
+            density="compact"
             @click="removePhase(phase.id)"
           />
         </v-card-title>
-        <v-card-text>
-          <div class="d-flex flex-column ga-3">
-
-            <div class="d-flex ga-2">
+        <v-card-text class="pa-3 pt-2">
+          <div class="d-flex flex-column ga-2">
+            <!-- Current + Unit -->
+            <div class="d-flex ga-2 flex-wrap align-center">
               <v-text-field
                 :model-value="phase.current"
                 :label="i18n.t('current')"
                 type="number"
                 variant="outlined"
-                density="comfortable"
+                density="compact"
+                hide-details="auto"
+                class="flex-grow-1"
+                style="min-width: 150px"
                 @update:model-value="
                   updatePhase(phase.id, { current: Number($event) })
                 "
               />
-              <v-select
+              <v-btn-toggle
                 :model-value="phase.currentUnit"
-                :items="[
-                  { title: 'µA', value: 'µA' },
-                  { title: 'mA', value: 'mA' },
-                  { title: 'A', value: 'A' },
-                ]"
-                label="Unit"
                 variant="outlined"
-                density="comfortable"
-                style="max-width: 120px"
+                density="compact"
+                mandatory
+                divided
+                class="unit-toggle"
                 @update:model-value="
                   updatePhase(phase.id, { currentUnit: $event as CurrentUnit })
                 "
-              />
+              >
+                <v-btn value="µA" size="small">µA</v-btn>
+                <v-btn value="mA" size="small">mA</v-btn>
+                <v-btn value="A" size="small">A</v-btn>
+              </v-btn-toggle>
             </div>
 
-            <div class="d-flex ga-2">
+            <!-- Duration + Unit -->
+            <div class="d-flex ga-2 flex-wrap align-center">
               <v-text-field
                 :model-value="phase.duration"
                 :label="i18n.t('duration')"
                 type="number"
                 variant="outlined"
-                density="comfortable"
+                density="compact"
+                hide-details="auto"
+                class="flex-grow-1"
+                style="min-width: 150px"
                 @update:model-value="
                   updatePhase(phase.id, { duration: Number($event) })
                 "
               />
-              <v-select
+              <v-btn-toggle
                 :model-value="phase.durationUnit"
-                :items="[
-                  { title: 'ms', value: 'ms' },
-                  { title: 's', value: 's' },
-                  { title: 'min', value: 'min' },
-                  { title: 'h', value: 'h' },
-                ]"
-                label="Unit"
                 variant="outlined"
-                density="comfortable"
-                style="max-width: 120px"
+                density="compact"
+                mandatory
+                divided
+                class="unit-toggle"
                 @update:model-value="
                   updatePhase(phase.id, {
                     durationUnit: $event as DurationUnit,
                   })
                 "
-              />
+              >
+                <v-btn value="ms" size="small">ms</v-btn>
+                <v-btn value="s" size="small">s</v-btn>
+                <v-btn value="min" size="small">min</v-btn>
+                <v-btn value="h" size="small">h</v-btn>
+              </v-btn-toggle>
             </div>
 
-            <!-- Frequency -->
-            <div class="d-flex ga-2">
+            <!-- Frequency + Unit -->
+            <div class="d-flex ga-2 flex-wrap align-center">
               <v-text-field
                 :model-value="phase.frequency"
                 :label="i18n.t('frequency')"
                 type="number"
                 variant="outlined"
-                density="comfortable"
+                density="compact"
+                hide-details="auto"
+                class="flex-grow-1"
+                style="min-width: 150px"
                 @update:model-value="
                   updatePhase(phase.id, { frequency: Number($event) })
                 "
               />
-              <v-select
+              <v-btn-toggle
                 :model-value="phase.frequencyUnit"
-                :items="[
-                  { title: i18n.t('perHour'), value: 'perHour' },
-                  { title: i18n.t('perDay'), value: 'perDay' },
-                  { title: i18n.t('perWeek'), value: 'perWeek' },
-                ]"
-                label="Unit"
                 variant="outlined"
-                density="comfortable"
-                style="max-width: 150px"
+                density="compact"
+                mandatory
+                divided
+                class="unit-toggle"
                 @update:model-value="
                   updatePhase(phase.id, {
                     frequencyUnit: $event,
                   })
                 "
-              />
+              >
+                <v-btn value="perHour" size="small">{{ i18n.t('perHour') }}</v-btn>
+                <v-btn value="perDay" size="small">{{ i18n.t('perDay') }}</v-btn>
+                <v-btn value="perWeek" size="small">{{ i18n.t('perWeek') }}</v-btn>
+              </v-btn-toggle>
             </div>
           </div>
         </v-card-text>
@@ -280,14 +288,45 @@ function handleNameUpdate(id: string, value: string) {
         v-if="nonDeepSleepPhases.length === 0"
         type="info"
         variant="tonal"
+        density="compact"
       >
         {{ i18n.t('noPhases') }}
       </v-alert>
+    </div>
+
+    <!-- Add Phase FAB Button -->
+    <div class="d-flex justify-center mt-4">
+      <v-tooltip location="top">
+        <template #activator="{ props: tooltipProps }">
+          <v-btn
+            color="primary"
+            icon="mdi-plus"
+            size="large"
+            class="add-phase-fab"
+            v-bind="tooltipProps"
+            @click="addPhase"
+          />
+        </template>
+        <span>{{ i18n.t('addPhase') }}</span>
+      </v-tooltip>
     </div>
   </div>
 </template>
 
 <style scoped>
+.modern-card {
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.phase-card {
+  transition: box-shadow 0.2s ease;
+}
+
+.phase-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
 .phase-title-editable {
   cursor: pointer;
   user-select: none;
@@ -308,9 +347,58 @@ function handleNameUpdate(id: string, value: string) {
 .phase-color-indicator {
   width: 16px;
   height: 16px;
-  border-radius: 2px;
+  border-radius: 3px;
   flex-shrink: 0;
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.add-phase-fab {
+  border-radius: 50% !important;
+  width: 56px;
+  height: 56px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.add-phase-fab:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* Prevent text capitalization in unit toggle buttons */
+.unit-toggle :deep(.v-btn) {
+  text-transform: none !important;
+  letter-spacing: normal !important;
+}
+
+/* Stretch button toggle groups to fill available space */
+.unit-toggle {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.unit-toggle :deep(.v-btn-toggle__wrapper) {
+  width: 100%;
+  display: flex;
+}
+
+.unit-toggle :deep(.v-btn) {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Responsive: Stack inputs on small screens */
+@media (max-width: 600px) {
+  .d-flex.flex-wrap > * {
+    flex-basis: 100% !important;
+    min-width: 100% !important;
+  }
+}
+
+/* Ensure side-by-side layout on md+ screens */
+@media (min-width: 600px) {
+  .d-flex.flex-wrap > .flex-grow-1 {
+    flex-basis: calc(50% - 8px);
+    max-width: calc(50% - 8px);
+  }
 }
 </style>
 

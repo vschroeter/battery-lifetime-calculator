@@ -80,11 +80,11 @@ function getConicGradient() {
 </script>
 
 <template>
-  <v-card variant="outlined">
-    <v-card-title class="text-subtitle-1">
+  <v-card class="modern-card" elevation="1">
+    <v-card-title class="text-subtitle-1 pa-3 pb-2">
       {{ i18n.t('consumptionShareByPhase') }}
     </v-card-title>
-    <v-card-text>
+    <v-card-text class="pa-3 pt-2">
       <div v-if="total > 0" class="d-flex align-center ga-4">
         <div
           class="donut-chart"
@@ -117,6 +117,10 @@ function getConicGradient() {
 </template>
 
 <style scoped>
+.modern-card {
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
 .donut-chart {
   width: 200px;
   height: 200px;
