@@ -35,24 +35,28 @@ const segments = computed(() => {
   })
 })
 
+const colors = [
+  '#1976d2',
+  '#388e3c',
+  '#f57c00',
+  '#d32f2f',
+  '#7b1fa2',
+  '#0288d1',
+  '#c2185b',
+  '#00796b',
+]
+
+function getColorForIndex(idx: number): string {
+  return colors[idx % colors.length]
+}
+
 function getConicGradient() {
   if (segments.value.length === 0) {
     return 'conic-gradient(grey 0deg 360deg)'
   }
 
-  const colors = [
-    '#1976d2',
-    '#388e3c',
-    '#f57c00',
-    '#d32f2f',
-    '#7b1fa2',
-    '#0288d1',
-    '#c2185b',
-    '#00796b',
-  ]
-
   const stops = segments.value.map((seg, idx) => {
-    const color = colors[idx % colors.length]
+    const color = getColorForIndex(idx)
     const start = seg.startAngle
     const end = seg.startAngle + seg.angle
     return `${color} ${start}deg ${end}deg`
@@ -82,7 +86,7 @@ function getConicGradient() {
             <div
               class="legend-color"
               :style="{
-                backgroundColor: `hsl(${(idx * 360) / segments.length}, 70%, 50%)`,
+                backgroundColor: getColorForIndex(idx),
               }"
             />
             <span class="ml-2 text-body-2">

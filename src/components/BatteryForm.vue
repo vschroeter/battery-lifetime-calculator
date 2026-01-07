@@ -30,19 +30,32 @@ const usablePercent = computed({
       density="comfortable"
     />
 
-    <v-text-field
-      v-model.number="usablePercent"
+    <v-slider
+      v-model="usablePercent"
       :label="i18n.t('usableCapacity')"
-      suffix="%"
-      type="number"
       min="1"
       max="100"
       step="1"
+      thumb-label
       variant="outlined"
       density="comfortable"
       :hint="i18n.t('usableCapacityHint')"
       persistent-hint
-    />
+    >
+      <template #append>
+        <v-text-field
+          v-model.number="usablePercent"
+          type="number"
+          style="width: 80px"
+          density="compact"
+          variant="outlined"
+          hide-details
+          min="1"
+          max="100"
+          step="1"
+        />
+      </template>
+    </v-slider>
   </v-form>
 </template>
 

@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useCalculatorStore } from '@/stores/calculator'
 import { useLocale } from '@/composables/useLocale'
 import type { Phase, PhaseMode, CurrentUnit, DurationUnit } from '@/types/calculator'
 
 const store = useCalculatorStore()
 const { i18n } = useLocale()
+
+const editingPhaseId = ref<string | null>(null)
 
 const phases = computed(() => store.phases)
 const defaultMode = computed({
@@ -44,6 +46,18 @@ function removePhase(id: string) {
 
 function updatePhase(id: string, updates: Partial<Phase>) {
   store.updatePhase(id, updates)
+}
+
+function startEditing(id: string) {
+  editingPhaseId.value = id
+}
+
+function stopEditing() {
+  editingPhaseId.value = null
+}
+
+function handleNameUpdate(id: string, value: string) {
+  updatePhase(id, { name: value })
 }
 </script>
 
@@ -130,7 +144,26 @@ function updatePhase(id: string, updates: Partial<Phase>) {
         variant="outlined"
       >
         <v-card-title class="d-flex justify-space-between align-center">
-          <span>{{ phase.name || 'Unnamed Phase' }}</span>
+          <div
+            v-if="editingPhaseId !== phase.id"
+            class="phase-title-editable"
+            @dblclick="startEditing(phase.id)"
+          >
+            {{ phase.name || 'Unnamed Phase' }}
+          </div>
+          <v-text-field
+            v-else
+            :model-value="phase.name"
+            variant="plain"
+            density="compact"
+            hide-details
+            autofocus
+            class="phase-title-input"
+            @update:model-value="handleNameUpdate(phase.id, $event)"
+            @blur="stopEditing"
+            @keydown.enter.prevent="stopEditing"
+            @keydown.esc="stopEditing"
+          />
           <v-btn
             icon="mdi-delete"
             variant="text"
@@ -141,13 +174,6 @@ function updatePhase(id: string, updates: Partial<Phase>) {
         </v-card-title>
         <v-card-text>
           <div class="d-flex flex-column ga-3">
-            <v-text-field
-              :model-value="phase.name"
-              :label="i18n.t('phaseName')"
-              variant="outlined"
-              density="comfortable"
-              @update:model-value="updatePhase(phase.id, { name: $event })"
-            />
 
             <div class="d-flex ga-2">
               <v-text-field
@@ -305,5 +331,22 @@ function updatePhase(id: string, updates: Partial<Phase>) {
   </div>
 </template>
 
-<style scoped></style>
+<style scoped>
+.phase-title-editable {
+  cursor: pointer;
+  user-select: none;
+  flex-grow: 1;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.phase-title-editable:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.phase-title-input {
+  flex-grow: 1;
+}
+</style>
 

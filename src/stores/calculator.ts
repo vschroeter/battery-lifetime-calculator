@@ -12,7 +12,7 @@ export const useCalculatorStore = defineStore('calculator', () => {
   // State
   const battery = ref<BatteryConfig>({
     capacity_mAh: 1000,
-    usablePercent: 100,
+    usablePercent: 80,
   })
 
   const phases = ref<Phase[]>([
@@ -80,7 +80,7 @@ export const useCalculatorStore = defineStore('calculator', () => {
   function resetToESP32Preset() {
     battery.value = {
       capacity_mAh: 1000,
-      usablePercent: 100,
+      usablePercent: 80,
     }
     phases.value = [
       {
