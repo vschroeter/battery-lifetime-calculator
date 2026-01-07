@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useLocale } from '@/composables/useLocale'
 import { useCalculatorStore } from '@/stores/calculator'
-import { getPhaseColorByIndex, DEEP_SLEEP_COLOR } from '@/lib/phaseColors'
+import { getPhaseColorByIndex, DEEP_SLEEP_COLOR, SELF_DISCHARGE_COLOR } from '@/lib/phaseColors'
 import type { PhaseResult } from '@/types/calculator'
 
 interface Props {
@@ -44,6 +44,11 @@ const segments = computed(() => {
 })
 
 function getColorForPhaseResult(result: PhaseResult): string {
+  // Check if this is the self-discharge virtual phase
+  if (result.phaseId === 'self-discharge-virtual') {
+    return SELF_DISCHARGE_COLOR
+  }
+
   // Check if this is a DeepSleep phase by looking it up in the store
   const phase = store.phases.find((p) => p.id === result.phaseId)
 

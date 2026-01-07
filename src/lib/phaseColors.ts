@@ -14,6 +14,7 @@ export const PHASE_COLORS = [
 ]
 
 export const DEEP_SLEEP_COLOR = '#9e9e9e'
+export const SELF_DISCHARGE_COLOR = '#ff9800'
 
 /**
  * Get color for a phase based on its index among non-DeepSleep phases
