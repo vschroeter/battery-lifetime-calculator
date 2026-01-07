@@ -8,7 +8,6 @@ import {
   convertCurrentTo_mA,
   convertDurationToHours,
   convertDurationToSeconds,
-  convertIntervalToSeconds,
   convertFrequencyToEventsPerDay,
 } from '@/lib/units'
 
@@ -24,28 +23,13 @@ function calculateEventsPerDay(phase: Phase): number {
     return 0 // DeepSleep is calculated separately
   }
 
-  if (phase.mode === 'interval') {
-    if (!phase.interval || !phase.intervalUnit) {
-      return 0
-    }
-    const intervalSeconds = convertIntervalToSeconds(
-      phase.interval,
-      phase.intervalUnit,
-    )
-    if (intervalSeconds <= 0) {
-      return 0
-    }
-    return SECONDS_PER_DAY / intervalSeconds
-  } else {
-    // mode === 'frequency'
-    if (!phase.frequency || !phase.frequencyUnit) {
-      return 0
-    }
-    return convertFrequencyToEventsPerDay(
-      phase.frequency,
-      phase.frequencyUnit,
-    )
+  if (!phase.frequency || !phase.frequencyUnit) {
+    return 0
   }
+  return convertFrequencyToEventsPerDay(
+    phase.frequency,
+    phase.frequencyUnit,
+  )
 }
 
 /**
@@ -150,33 +134,10 @@ export function calculate(
       if (phase.duration <= 0) {
         errors.push(`Phase "${phase.name}": Duration must be greater than 0`)
       }
-      if (phase.mode === 'interval') {
-        if (!phase.interval || phase.interval <= 0) {
-          errors.push(
-            `Phase "${phase.name}": Interval must be greater than 0`,
-          )
-        } else {
-          const intervalSeconds = convertIntervalToSeconds(
-            phase.interval,
-            phase.intervalUnit!,
-          )
-          const durationSeconds = convertDurationToSeconds(
-            phase.duration,
-            phase.durationUnit,
-          )
-          if (durationSeconds > intervalSeconds) {
-            warnings.push(
-              `Phase "${phase.name}": Duration (${phase.duration} ${phase.durationUnit}) exceeds interval (${phase.interval} ${phase.intervalUnit})`,
-            )
-          }
-        }
-      } else {
-        // mode === 'frequency'
-        if (!phase.frequency || phase.frequency <= 0) {
-          errors.push(
-            `Phase "${phase.name}": Frequency must be greater than 0`,
-          )
-        }
+      if (!phase.frequency || phase.frequency <= 0) {
+        errors.push(
+          `Phase "${phase.name}": Frequency must be greater than 0`,
+        )
       }
     }
   }

@@ -5,7 +5,6 @@ import { useLocale } from '@/composables/useLocale'
 import { calculate } from '@/lib/calc'
 import { exportConfigAsJSON, exportResultsAsCSV } from '@/lib/export'
 import PhaseShareDonut from '@/components/Charts/PhaseShareDonut.vue'
-import CycleTimeline from '@/components/Charts/CycleTimeline.vue'
 import SensitivityBar from '@/components/SensitivityBar.vue'
 
 const store = useCalculatorStore()
@@ -128,14 +127,14 @@ const displayResult = computed(() => {
               <div class="text-h6 mb-1">{{ i18n.t('estimatedRuntime') }}</div>
               <div class="text-h4">
                 {{ displayResult.runtimeDays.toFixed(1) }} {{ i18n.t('days') }}
+                <span class="text-body-2 ml-3">
+                  ({{ displayResult.runtimeWeeks.toFixed(1) }} {{ i18n.t('weeks') }},
+                  {{ displayResult.runtimeMonths.toFixed(1) }} {{ i18n.t('months') }})
+                </span>
               </div>
-              <div class="text-body-2 mt-1">
-                ({{ displayResult.runtimeWeeks.toFixed(1) }} {{ i18n.t('weeks') }},
-                {{ displayResult.runtimeMonths.toFixed(1) }} {{ i18n.t('months') }})
-              </div>
-              <div class="text-caption mt-1 text-medium-emphasis">
+              <!-- <div class="text-caption mt-1 text-medium-emphasis">
                 {{ i18n.t('monthNote') }}
-              </div>
+              </div> -->
             </v-card-text>
           </v-card>
 
@@ -182,8 +181,7 @@ const displayResult = computed(() => {
           <!-- Visualizations -->
           <div class="d-flex flex-column ga-3 mt-3">
             <PhaseShareDonut :phase-results="displayResult.phaseResults" />
-            <CycleTimeline />
-            <SensitivityBar />
+            <!-- <SensitivityBar /> -->
           </div>
         </div>
       </div>

@@ -3,7 +3,6 @@ import { ref, computed } from 'vue'
 import type {
   BatteryConfig,
   Phase,
-  PhaseMode,
   CalculatorState,
   CalculationResult,
 } from '@/types/calculator'
@@ -24,9 +23,8 @@ export const useCalculatorStore = defineStore('calculator', () => {
       currentUnit: 'mA',
       duration: 0.2,
       durationUnit: 's',
-      mode: 'interval',
-      interval: 60,
-      intervalUnit: 's',
+      frequency: 1,
+      frequencyUnit: 'perHour',
     },
     {
       id: 'deepsleep-1',
@@ -36,17 +34,15 @@ export const useCalculatorStore = defineStore('calculator', () => {
       currentUnit: 'mA',
       duration: 0,
       durationUnit: 's',
-      mode: 'interval',
+      frequency: 0,
+      frequencyUnit: 'perHour',
     },
   ])
-
-  const defaultPhaseMode = ref<PhaseMode>('interval')
 
   // Getters
   const state = computed<CalculatorState>(() => ({
     battery: battery.value,
     phases: phases.value,
-    defaultPhaseMode: defaultPhaseMode.value,
   }))
 
   // Actions
@@ -73,10 +69,6 @@ export const useCalculatorStore = defineStore('calculator', () => {
     phases.value = phases.value.filter((p) => p.id !== id)
   }
 
-  function setDefaultPhaseMode(mode: PhaseMode) {
-    defaultPhaseMode.value = mode
-  }
-
   function resetToESP32Preset() {
     battery.value = {
       capacity_mAh: 1000,
@@ -91,9 +83,8 @@ export const useCalculatorStore = defineStore('calculator', () => {
         currentUnit: 'mA',
         duration: 0.2,
         durationUnit: 's',
-        mode: 'interval',
-        interval: 60,
-        intervalUnit: 's',
+        frequency: 1,
+        frequencyUnit: 'perHour',
       },
       {
         id: 'deepsleep-1',
@@ -103,22 +94,20 @@ export const useCalculatorStore = defineStore('calculator', () => {
         currentUnit: 'mA',
         duration: 0,
         durationUnit: 's',
-        mode: 'interval',
+        frequency: 0,
+        frequencyUnit: 'perHour',
       },
     ]
-    defaultPhaseMode.value = 'interval'
   }
 
   return {
     battery,
     phases,
-    defaultPhaseMode,
     state,
     updateBattery,
     addPhase,
     updatePhase,
     removePhase,
-    setDefaultPhaseMode,
     resetToESP32Preset,
   }
 })

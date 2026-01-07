@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { useCalculatorStore } from '@/stores/calculator'
 import { useLocale } from '@/composables/useLocale'
 import { usePhaseColors } from '@/composables/usePhaseColors'
-import type { Phase, PhaseMode, CurrentUnit, DurationUnit } from '@/types/calculator'
+import type { Phase, CurrentUnit, DurationUnit } from '@/types/calculator'
 
 const store = useCalculatorStore()
 const { i18n } = useLocale()
@@ -12,10 +12,6 @@ const { getPhaseColor } = usePhaseColors()
 const editingPhaseId = ref<string | null>(null)
 
 const phases = computed(() => store.phases)
-const defaultMode = computed({
-  get: () => store.defaultPhaseMode,
-  set: (value) => store.setDefaultPhaseMode(value),
-})
 
 const nonDeepSleepPhases = computed(() =>
   phases.value.filter((p) => !p.isDeepSleep),
@@ -32,10 +28,8 @@ function addPhase() {
     currentUnit: 'mA',
     duration: 1,
     durationUnit: 's',
-    mode: defaultMode.value,
-    ...(defaultMode.value === 'interval'
-      ? { interval: 60, intervalUnit: 's' as const }
-      : { frequency: 1, frequencyUnit: 'perHour' as const }),
+    frequency: 1,
+    frequencyUnit: 'perHour',
   })
 }
 
@@ -66,17 +60,6 @@ function handleNameUpdate(id: string, value: string) {
 <template>
   <div>
     <div class="d-flex justify-space-between align-center mb-4">
-      <v-select
-        v-model="defaultMode"
-        :items="[
-          { title: i18n.t('modeA'), value: 'interval' },
-          { title: i18n.t('modeB'), value: 'frequency' },
-        ]"
-        :label="i18n.t('defaultInputMode')"
-        variant="outlined"
-        density="comfortable"
-        style="max-width: 300px"
-      />
       <v-btn color="primary" prepend-icon="mdi-plus" @click="addPhase">
         {{ i18n.t('addPhase') }}
       </v-btn>
@@ -259,88 +242,36 @@ function handleNameUpdate(id: string, value: string) {
               />
             </div>
 
-            <v-select
-              :model-value="phase.mode"
-              :items="[
-                { title: i18n.t('modeA'), value: 'interval' },
-                {
-                  title: i18n.t('modeB'),
-                  value: 'frequency',
-                },
-              ]"
-              :label="i18n.t('inputMode')"
-              variant="outlined"
-              density="comfortable"
-              @update:model-value="
-                updatePhase(phase.id, { mode: $event as PhaseMode })
-              "
-            />
-
-            <!-- Mode A: Interval -->
-            <template v-if="phase.mode === 'interval'">
-              <div class="d-flex ga-2">
-                <v-text-field
-                  :model-value="phase.interval"
-                  :label="i18n.t('interval')"
-                  type="number"
-                  variant="outlined"
-                  density="comfortable"
-                  @update:model-value="
-                    updatePhase(phase.id, { interval: Number($event) })
-                  "
-                />
-                <v-select
-                  :model-value="phase.intervalUnit"
-                  :items="[
-                    { title: 's', value: 's' },
-                    { title: 'min', value: 'min' },
-                    { title: 'h', value: 'h' },
-                  ]"
-                  label="Unit"
-                  variant="outlined"
-                  density="comfortable"
-                  style="max-width: 120px"
-                  @update:model-value="
-                    updatePhase(phase.id, {
-                      intervalUnit: $event,
-                    })
-                  "
-                />
-              </div>
-            </template>
-
-            <!-- Mode B: Frequency -->
-            <template v-else>
-              <div class="d-flex ga-2">
-                <v-text-field
-                  :model-value="phase.frequency"
-                  :label="i18n.t('frequency')"
-                  type="number"
-                  variant="outlined"
-                  density="comfortable"
-                  @update:model-value="
-                    updatePhase(phase.id, { frequency: Number($event) })
-                  "
-                />
-                <v-select
-                  :model-value="phase.frequencyUnit"
-                  :items="[
-                    { title: i18n.t('perHour'), value: 'perHour' },
-                    { title: i18n.t('perDay'), value: 'perDay' },
-                    { title: i18n.t('perWeek'), value: 'perWeek' },
-                  ]"
-                  label="Unit"
-                  variant="outlined"
-                  density="comfortable"
-                  style="max-width: 150px"
-                  @update:model-value="
-                    updatePhase(phase.id, {
-                      frequencyUnit: $event,
-                    })
-                  "
-                />
-              </div>
-            </template>
+            <!-- Frequency -->
+            <div class="d-flex ga-2">
+              <v-text-field
+                :model-value="phase.frequency"
+                :label="i18n.t('frequency')"
+                type="number"
+                variant="outlined"
+                density="comfortable"
+                @update:model-value="
+                  updatePhase(phase.id, { frequency: Number($event) })
+                "
+              />
+              <v-select
+                :model-value="phase.frequencyUnit"
+                :items="[
+                  { title: i18n.t('perHour'), value: 'perHour' },
+                  { title: i18n.t('perDay'), value: 'perDay' },
+                  { title: i18n.t('perWeek'), value: 'perWeek' },
+                ]"
+                label="Unit"
+                variant="outlined"
+                density="comfortable"
+                style="max-width: 150px"
+                @update:model-value="
+                  updatePhase(phase.id, {
+                    frequencyUnit: $event,
+                  })
+                "
+              />
+            </div>
           </div>
         </v-card-text>
       </v-card>
