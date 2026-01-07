@@ -5,6 +5,7 @@ export type FrequencyUnit = 'perHour' | 'perDay' | 'perWeek'
 export interface BatteryConfig {
   capacity_mAh: number
   usablePercent: number
+  selfDischargePercentPerMonth: number
 }
 
 export interface Phase {
@@ -39,6 +40,7 @@ export interface CalculationResult {
   runtimeDays: number
   runtimeWeeks: number
   runtimeMonths: number
+  runtimeYears: number
   errors: string[]
   warnings: string[]
 }

@@ -135,6 +135,9 @@ const displayResult = computed(() => {
               <div class="text-body-2 text-medium-emphasis">
                 {{ displayResult.runtimeWeeks.toFixed(1) }} {{ i18n.t('weeks') }},
                 {{ displayResult.runtimeMonths.toFixed(1) }} {{ i18n.t('months') }}
+                <template v-if="displayResult.runtimeYears > 0">
+                  , {{ displayResult.runtimeYears.toFixed(1) }} {{ i18n.t('years') }}
+                </template>
               </div>
             </v-card-text>
           </v-card>

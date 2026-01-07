@@ -12,6 +12,7 @@ export const useCalculatorStore = defineStore('calculator', () => {
   const battery = ref<BatteryConfig>({
     capacity_mAh: 1000,
     usablePercent: 80,
+    selfDischargePercentPerMonth: 0,
   })
 
   const phases = ref<Phase[]>([
@@ -77,6 +78,7 @@ export const useCalculatorStore = defineStore('calculator', () => {
     battery.value = {
       capacity_mAh: 1000,
       usablePercent: 80,
+      selfDischargePercentPerMonth: 0,
     }
     phases.value = [
       {

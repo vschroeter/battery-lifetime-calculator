@@ -19,6 +19,11 @@ const usablePercent = computed({
 const usableCapacity_mAh = computed(() => {
   return store.battery.capacity_mAh * (store.battery.usablePercent / 100)
 })
+
+const selfDischargePercentPerMonth = computed({
+  get: () => store.battery.selfDischargePercentPerMonth,
+  set: (value) => store.updateBattery({ selfDischargePercentPerMonth: value }),
+})
 </script>
 
 <template>
@@ -64,6 +69,22 @@ const usableCapacity_mAh = computed(() => {
     </div>
     <div class="text-caption text-medium-emphasis mt-n2">
       {{ i18n.t('usableCapacity') }}: {{ usableCapacity_mAh.toFixed(0) }} mAh
+    </div>
+
+    <v-text-field
+      v-model.number="selfDischargePercentPerMonth"
+      :label="i18n.t('selfDischarge')"
+      suffix="%/month"
+      type="number"
+      min="0"
+      max="99.99"
+      step="0.1"
+      variant="outlined"
+      density="compact"
+      hide-details="auto"
+    />
+    <div class="text-caption text-medium-emphasis mt-n2">
+      {{ i18n.t('selfDischargeHint') }}
     </div>
   </v-form>
 </template>

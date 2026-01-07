@@ -27,6 +27,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     days: 'Tage',
     weeks: 'Wochen',
     months: 'Monate',
+    years: 'Jahre',
     monthNote: 'Monat = 30.44 Tage',
     consumptionByPhase: 'Verbrauch nach Phase',
     phase: 'Phase',
@@ -46,6 +47,8 @@ export const messages: Record<Locale, Record<string, string>> = {
     noPhases: 'Keine aktiven Phasen. Klicken Sie auf "Phase hinzufügen", um eine hinzuzufügen.',
     deepSleepAutoCalculated: 'Dauer wird automatisch als verbleibende Zeit nach allen aktiven Phasen berechnet.',
     removeAllPhases: 'Alle Phasen entfernen',
+    selfDischarge: 'Selbstentladung',
+    selfDischargeHint: 'Prozentsatz der Kapazität, die pro Monat durch Selbstentladung verloren geht',
   },
   en: {
     appTitle: 'Battery Lifetime Calculator',
@@ -73,6 +76,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     days: 'days',
     weeks: 'weeks',
     months: 'months',
+    years: 'years',
     monthNote: 'Month = 30.44 days',
     consumptionByPhase: 'Consumption by Phase',
     phase: 'Phase',
@@ -92,6 +96,8 @@ export const messages: Record<Locale, Record<string, string>> = {
     noPhases: 'No active phases. Click "Add Phase" to add one.',
     deepSleepAutoCalculated: 'Duration is automatically calculated as the remaining time after all active phases.',
     removeAllPhases: 'Remove All Phases',
+    selfDischarge: 'Self-Discharge',
+    selfDischargeHint: 'Percentage of capacity lost per month due to self-discharge',
   },
 }
 
