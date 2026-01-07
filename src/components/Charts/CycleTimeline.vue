@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { useCalculatorStore } from '@/stores/calculator'
 import { useLocale } from '@/composables/useLocale'
 import { convertIntervalToSeconds, convertDurationToSeconds } from '@/lib/units'
+import { getPhaseColorByIndex, DEEP_SLEEP_COLOR } from '@/lib/phaseColors'
 import type { Phase } from '@/types/calculator'
 
 const store = useCalculatorStore()
@@ -11,7 +12,7 @@ const { i18n } = useLocale()
 // Find the most common interval from Mode A phases
 const referenceInterval = computed(() => {
   const intervals = new Map<number, number>()
-  
+
   for (const phase of store.phases) {
     if (!phase.isDeepSleep && phase.mode === 'interval' && phase.interval && phase.intervalUnit) {
       const seconds = convertIntervalToSeconds(phase.interval, phase.intervalUnit)
@@ -43,7 +44,8 @@ const timelinePhases = computed(() => {
     color: string
   }> = []
 
-  const colors = ['#1976d2', '#388e3c', '#f57c00', '#d32f2f', '#7b1fa2']
+  // Get all non-DeepSleep phases to determine color indices
+  const allNonDeepSleepPhases = store.phases.filter((p) => !p.isDeepSleep)
   let currentTime = 0
   let colorIdx = 0
 
@@ -53,16 +55,22 @@ const timelinePhases = computed(() => {
 
     if (phase.mode === 'interval' && phase.interval && phase.intervalUnit) {
       const intervalSeconds = convertIntervalToSeconds(phase.interval, phase.intervalUnit)
-      
+
       if (intervalSeconds === referenceInterval.value) {
         const durationSeconds = convertDurationToSeconds(phase.duration, phase.durationUnit)
-        
+
         if (currentTime + durationSeconds <= referenceInterval.value) {
+          // Find the index of this phase among all non-DeepSleep phases
+          const phaseIndex = allNonDeepSleepPhases.findIndex((p) => p.id === phase.id)
+          const color = phaseIndex !== -1
+            ? getPhaseColorByIndex(phaseIndex)
+            : getPhaseColorByIndex(colorIdx)
+
           phases.push({
             phase,
             startSeconds: currentTime,
             durationSeconds,
-            color: colors[colorIdx % colors.length],
+            color,
           })
           currentTime += durationSeconds
           colorIdx++
@@ -78,7 +86,7 @@ const timelinePhases = computed(() => {
       phase: deepSleepPhase,
       startSeconds: currentTime,
       durationSeconds: referenceInterval.value - currentTime,
-      color: '#9e9e9e',
+      color: DEEP_SLEEP_COLOR,
     })
   }
 

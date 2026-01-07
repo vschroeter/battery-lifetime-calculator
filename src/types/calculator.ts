@@ -1,13 +1,11 @@
 export type CurrentUnit = 'µA' | 'mA' | 'A'
 export type DurationUnit = 'ms' | 's' | 'min' | 'h'
-export type IntervalUnit = 's' | 'min' | 'h'
 export type FrequencyUnit = 'perHour' | 'perDay' | 'perWeek'
-
-export type PhaseMode = 'interval' | 'frequency'
 
 export interface BatteryConfig {
   capacity_mAh: number
   usablePercent: number
+  selfDischargePercentPerMonth: number
 }
 
 export interface Phase {
@@ -18,19 +16,13 @@ export interface Phase {
   currentUnit: CurrentUnit
   duration: number
   durationUnit: DurationUnit
-  mode: PhaseMode
-  // Mode A: interval
-  interval?: number
-  intervalUnit?: IntervalUnit
-  // Mode B: frequency
-  frequency?: number
-  frequencyUnit?: FrequencyUnit
+  frequency: number
+  frequencyUnit: FrequencyUnit
 }
 
 export interface CalculatorState {
   battery: BatteryConfig
   phases: Phase[]
-  defaultPhaseMode: PhaseMode
 }
 
 export interface PhaseResult {
@@ -48,6 +40,7 @@ export interface CalculationResult {
   runtimeDays: number
   runtimeWeeks: number
   runtimeMonths: number
+  runtimeYears: number
   errors: string[]
   warnings: string[]
 }

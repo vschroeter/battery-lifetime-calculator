@@ -1,7 +1,6 @@
 import type {
   CurrentUnit,
   DurationUnit,
-  IntervalUnit,
   FrequencyUnit,
 } from '@/types/calculator'
 
@@ -55,25 +54,6 @@ export function convertDurationToSeconds(
   switch (unit) {
     case 'ms':
       return value / 1000
-    case 's':
-      return value
-    case 'min':
-      return value * 60
-    case 'h':
-      return value * 3600
-    default:
-      return value
-  }
-}
-
-/**
- * Convert interval to seconds
- */
-export function convertIntervalToSeconds(
-  value: number,
-  unit: IntervalUnit,
-): number {
-  switch (unit) {
     case 's':
       return value
     case 'min':
