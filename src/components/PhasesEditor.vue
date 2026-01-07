@@ -86,30 +86,40 @@ function handleNameUpdate(id: string, value: string) {
 
     <!-- DeepSleep Phase (special handling) -->
     <div v-if="deepSleepPhases.length > 0" class="mb-4">
-      <v-card variant="outlined" color="info">
-        <v-card-title class="text-subtitle-1">
-          DeepSleep (Auto-calculated rest time)
+      <v-card
+        v-for="phase in deepSleepPhases"
+        :key="phase.id"
+        variant="outlined"
+        color="info"
+      >
+        <v-card-title class="d-flex align-center ga-2">
+          <div
+            class="phase-color-indicator"
+            :style="{ backgroundColor: getPhaseColor(phase) }"
+          />
+          <div
+            v-if="editingPhaseId !== phase.id"
+            class="phase-title-editable"
+            @dblclick="startEditing(phase.id)"
+          >
+            {{ phase.name || 'Unnamed Phase' }}
+          </div>
+          <v-text-field
+            v-else
+            :model-value="phase.name"
+            variant="plain"
+            density="compact"
+            hide-details
+            autofocus
+            class="phase-title-input"
+            @update:model-value="handleNameUpdate(phase.id, $event)"
+            @blur="stopEditing"
+            @keydown.enter.prevent="stopEditing"
+            @keydown.esc="stopEditing"
+          />
         </v-card-title>
         <v-card-text>
-          <div
-            v-for="phase in deepSleepPhases"
-            :key="phase.id"
-            class="d-flex flex-column ga-2"
-          >
-            <div class="d-flex align-center ga-2">
-              <div
-                class="phase-color-indicator"
-                :style="{ backgroundColor: getPhaseColor(phase) }"
-              />
-              <v-text-field
-                :model-value="phase.name"
-                label="Name"
-                variant="outlined"
-                density="comfortable"
-                class="flex-grow-1"
-                @update:model-value="updatePhase(phase.id, { name: $event })"
-              />
-            </div>
+          <div class="d-flex flex-column ga-2">
             <div class="d-flex ga-2">
               <v-text-field
                 :model-value="phase.current"
