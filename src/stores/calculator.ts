@@ -4,7 +4,6 @@ import type {
   BatteryConfig,
   Phase,
   CalculatorState,
-  CalculationResult,
 } from '@/types/calculator'
 
 export const useCalculatorStore = defineStore('calculator', () => {
@@ -62,7 +61,7 @@ export const useCalculatorStore = defineStore('calculator', () => {
   function updatePhase(id: string, updates: Partial<Phase>) {
     const index = phases.value.findIndex((p) => p.id === id)
     if (index !== -1) {
-      phases.value[index] = { ...phases.value[index], ...updates }
+      phases.value[index] = { ...phases.value[index]!, ...updates }
     }
   }
 
