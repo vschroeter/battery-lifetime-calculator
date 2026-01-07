@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useLocale } from '@/composables/useLocale'
+import { useCalculatorStore } from '@/stores/calculator'
+import { getPhaseColorByIndex, DEEP_SLEEP_COLOR } from '@/lib/phaseColors'
 import type { PhaseResult } from '@/types/calculator'
 
 interface Props {
@@ -9,9 +11,15 @@ interface Props {
 
 const props = defineProps<Props>()
 const { i18n } = useLocale()
+const store = useCalculatorStore()
 
 const total = computed(() =>
   props.phaseResults.reduce((sum, r) => sum + r.mAhPerDay, 0),
+)
+
+// Get all non-DeepSleep phases to determine color indices
+const nonDeepSleepPhases = computed(() =>
+  store.phases.filter((p) => !p.isDeepSleep),
 )
 
 const segments = computed(() => {
@@ -35,19 +43,24 @@ const segments = computed(() => {
   })
 })
 
-const colors = [
-  '#1976d2',
-  '#388e3c',
-  '#f57c00',
-  '#d32f2f',
-  '#7b1fa2',
-  '#0288d1',
-  '#c2185b',
-  '#00796b',
-]
+function getColorForPhaseResult(result: PhaseResult): string {
+  // Check if this is a DeepSleep phase by looking it up in the store
+  const phase = store.phases.find((p) => p.id === result.phaseId)
 
-function getColorForIndex(idx: number): string {
-  return colors[idx % colors.length]
+  if (phase?.isDeepSleep) {
+    return DEEP_SLEEP_COLOR
+  }
+
+  // For non-DeepSleep phases, find the index among non-DeepSleep phases
+  const phaseIndex = nonDeepSleepPhases.value.findIndex(
+    (p) => p.id === result.phaseId,
+  )
+
+  if (phaseIndex === -1) {
+    return getPhaseColorByIndex(0) // Fallback
+  }
+
+  return getPhaseColorByIndex(phaseIndex)
 }
 
 function getConicGradient() {
@@ -55,8 +68,8 @@ function getConicGradient() {
     return 'conic-gradient(grey 0deg 360deg)'
   }
 
-  const stops = segments.value.map((seg, idx) => {
-    const color = getColorForIndex(idx)
+  const stops = segments.value.map((seg) => {
+    const color = getColorForPhaseResult(seg)
     const start = seg.startAngle
     const end = seg.startAngle + seg.angle
     return `${color} ${start}deg ${end}deg`
@@ -79,14 +92,14 @@ function getConicGradient() {
         />
         <div class="flex-grow-1">
           <div
-            v-for="(seg, idx) in segments"
+            v-for="seg in segments"
             :key="seg.phaseId"
             class="d-flex align-center mb-2"
           >
             <div
               class="legend-color"
               :style="{
-                backgroundColor: getColorForIndex(idx),
+                backgroundColor: getColorForPhaseResult(seg),
               }"
             />
             <span class="ml-2 text-body-2">

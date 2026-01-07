@@ -2,10 +2,12 @@
 import { computed, ref } from 'vue'
 import { useCalculatorStore } from '@/stores/calculator'
 import { useLocale } from '@/composables/useLocale'
+import { usePhaseColors } from '@/composables/usePhaseColors'
 import type { Phase, PhaseMode, CurrentUnit, DurationUnit } from '@/types/calculator'
 
 const store = useCalculatorStore()
 const { i18n } = useLocale()
+const { getPhaseColor } = usePhaseColors()
 
 const editingPhaseId = ref<string | null>(null)
 
@@ -94,13 +96,20 @@ function handleNameUpdate(id: string, value: string) {
             :key="phase.id"
             class="d-flex flex-column ga-2"
           >
-            <v-text-field
-              :model-value="phase.name"
-              label="Name"
-              variant="outlined"
-              density="comfortable"
-              @update:model-value="updatePhase(phase.id, { name: $event })"
-            />
+            <div class="d-flex align-center ga-2">
+              <div
+                class="phase-color-indicator"
+                :style="{ backgroundColor: getPhaseColor(phase) }"
+              />
+              <v-text-field
+                :model-value="phase.name"
+                label="Name"
+                variant="outlined"
+                density="comfortable"
+                class="flex-grow-1"
+                @update:model-value="updatePhase(phase.id, { name: $event })"
+              />
+            </div>
             <div class="d-flex ga-2">
               <v-text-field
                 :model-value="phase.current"
@@ -144,26 +153,32 @@ function handleNameUpdate(id: string, value: string) {
         variant="outlined"
       >
         <v-card-title class="d-flex justify-space-between align-center">
-          <div
-            v-if="editingPhaseId !== phase.id"
-            class="phase-title-editable"
-            @dblclick="startEditing(phase.id)"
-          >
-            {{ phase.name || 'Unnamed Phase' }}
+          <div class="d-flex align-center ga-2 flex-grow-1">
+            <div
+              class="phase-color-indicator"
+              :style="{ backgroundColor: getPhaseColor(phase) }"
+            />
+            <div
+              v-if="editingPhaseId !== phase.id"
+              class="phase-title-editable"
+              @dblclick="startEditing(phase.id)"
+            >
+              {{ phase.name || 'Unnamed Phase' }}
+            </div>
+            <v-text-field
+              v-else
+              :model-value="phase.name"
+              variant="plain"
+              density="compact"
+              hide-details
+              autofocus
+              class="phase-title-input"
+              @update:model-value="handleNameUpdate(phase.id, $event)"
+              @blur="stopEditing"
+              @keydown.enter.prevent="stopEditing"
+              @keydown.esc="stopEditing"
+            />
           </div>
-          <v-text-field
-            v-else
-            :model-value="phase.name"
-            variant="plain"
-            density="compact"
-            hide-details
-            autofocus
-            class="phase-title-input"
-            @update:model-value="handleNameUpdate(phase.id, $event)"
-            @blur="stopEditing"
-            @keydown.enter.prevent="stopEditing"
-            @keydown.esc="stopEditing"
-          />
           <v-btn
             icon="mdi-delete"
             variant="text"
@@ -347,6 +362,14 @@ function handleNameUpdate(id: string, value: string) {
 
 .phase-title-input {
   flex-grow: 1;
+}
+
+.phase-color-indicator {
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.12);
 }
 </style>
 
