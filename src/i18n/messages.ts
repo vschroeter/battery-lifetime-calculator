@@ -49,6 +49,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     removeAllPhases: 'Alle Phasen entfernen',
     selfDischarge: 'Selbstentladung',
     selfDischargeHint: 'Prozentsatz der Kapazität, die pro Monat durch Selbstentladung verloren geht',
+    inputs: 'Eingaben',
   },
   en: {
     appTitle: 'Battery Lifetime Calculator',
@@ -98,6 +99,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     removeAllPhases: 'Remove All Phases',
     selfDischarge: 'Self-Discharge',
     selfDischargeHint: 'Percentage of capacity lost per month due to self-discharge',
+    inputs: 'Inputs',
   },
 }
 

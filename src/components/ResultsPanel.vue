@@ -32,8 +32,8 @@ const displayResult = computed(() => {
 </script>
 
 <template>
-  <v-card class="modern-card" elevation="1">
-    <v-card-title class="d-flex justify-space-between align-center flex-wrap ga-2 pa-4 pb-2">
+  <v-card class="modern-card results-card" elevation="1">
+    <v-card-title class="d-flex justify-space-between align-center flex-wrap ga-2 pa-4 pb-2 results-card-header">
       <span class="text-h6">{{ i18n.t('results') }}</span>
       <div class="d-flex ga-2">
         <v-btn
@@ -72,7 +72,7 @@ const displayResult = computed(() => {
         </v-menu>
       </div>
     </v-card-title>
-    <v-card-text class="pa-4 pt-2">
+    <v-card-text class="pa-4 pt-2 results-card-content">
       <div v-if="displayResult">
         <!-- Errors -->
         <v-alert
@@ -142,6 +142,12 @@ const displayResult = computed(() => {
             </v-card-text>
           </v-card>
 
+          <!-- Visualizations -->
+          <div class="d-flex flex-column ga-3 mt-3">
+            <PhaseShareDonut :phase-results="displayResult.phaseResults" />
+            <!-- <SensitivityBar /> -->
+          </div>
+
           <!-- Phase Breakdown -->
           <v-card class="modern-card" elevation="1">
             <v-card-title class="text-subtitle-1 pa-3 pb-2">
@@ -182,11 +188,6 @@ const displayResult = computed(() => {
             </v-card-text>
           </v-card>
 
-          <!-- Visualizations -->
-          <div class="d-flex flex-column ga-3 mt-3">
-            <PhaseShareDonut :phase-results="displayResult.phaseResults" />
-            <!-- <SensitivityBar /> -->
-          </div>
         </div>
       </div>
       <v-alert v-else type="info" variant="tonal" density="compact">
@@ -200,6 +201,25 @@ const displayResult = computed(() => {
 .modern-card {
   border-radius: 12px;
   border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+/* Results card layout for scroll pane */
+.results-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.results-card-header {
+  flex-shrink: 0;
+}
+
+.results-card-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .result-tile {
