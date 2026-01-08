@@ -108,7 +108,7 @@ provide('i18n', i18n)
 
       <!-- Large screens: Two-column layout with independent scrolling -->
       <template v-else>
-        <v-container class="pa-4 pa-md-6 two-column-container" fluid>
+        <v-container class="pa-4 pa-md-6 two-column-container">
           <v-row class="two-column-row">
             <v-col cols="12" lg="6" class="left-column">
               <div class="scroll-pane">

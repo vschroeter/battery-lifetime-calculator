@@ -69,7 +69,7 @@ function getInnerRadius(phaseType: 'active' | 'self-discharge' | 'deepsleep'): n
 function getColorForPhaseResult(result: PhaseResult): string {
   const phase = store.phases.find((p) => p.id === result.phaseId)
   const nonDeepSleepPhaseIds = nonDeepSleepPhases.value.map((p) => p.id)
-  
+
   return getColorForPhaseId(
     result.phaseId,
     nonDeepSleepPhaseIds,

@@ -167,6 +167,14 @@ const displayResult = computed(() => {
                   <tr
                     v-for="result in displayResult.phaseResults"
                     :key="result.phaseId"
+                    class="phase-breakdown-row"
+                    :class="{ 'phase-breakdown-row-highlighted': store.hoveredPhaseId === result.phaseId }"
+                    :style="{
+                      opacity:
+                        store.hoveredPhaseId === null || store.hoveredPhaseId === result.phaseId ? 1 : 0.3,
+                    }"
+                    @mouseenter="store.setHoveredPhase(result.phaseId)"
+                    @mouseleave="store.setHoveredPhase(null)"
                   >
                     <td class="text-body-2">{{ result.phaseName }}</td>
                     <td class="text-end text-body-2">
@@ -251,6 +259,15 @@ const displayResult = computed(() => {
 
 .results-table :deep(tbody tr:last-child td) {
   border-bottom: none;
+}
+
+.results-table :deep(tbody tr.phase-breakdown-row) {
+  cursor: pointer;
+  transition: opacity 0.2s ease, background-color 0.2s ease;
+}
+
+.results-table :deep(tbody tr.phase-breakdown-row-highlighted td) {
+  background-color: rgba(0, 0, 0, 0.05);
 }
 
 /* Responsive: Stack result tiles on small screens */
