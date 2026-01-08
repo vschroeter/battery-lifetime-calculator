@@ -8,7 +8,7 @@ import ResultsPanel from '@/components/ResultsPanel.vue'
 import { useI18nLite } from '@/composables/useI18n'
 import { useCalculatorStore } from '@/stores/calculator'
 
-const locale = ref<Locale>('de')
+const locale = ref<Locale>('en')
 const i18n = useI18nLite(locale)
 const store = useCalculatorStore()
 const display = useDisplay()
@@ -30,8 +30,23 @@ provide('i18n', i18n)
 <template>
   <v-app>
       <v-app-bar color="primary" prominent>
-      <v-app-bar-title>{{ i18n.t('appTitle') }}</v-app-bar-title>
+      <v-img
+        src="/icons/BatteryIcon.svg"
+        max-width="40"
+        max-height="40"
+        class="mr-3"
+        alt="Battery Icon"
+      />
       <v-spacer />
+      <v-app-bar-title class="text-center">{{ i18n.t('appTitle') }}</v-app-bar-title>
+      <v-spacer />
+      <v-btn
+        icon="mdi-github"
+        variant="text"
+        href="https://github.com/vschroeter/battery-lifetime-calculator"
+        target="_blank"
+        rel="noopener noreferrer"
+      />
       <v-btn
         prepend-icon="mdi-translate"
         variant="text"
@@ -158,6 +173,12 @@ provide('i18n', i18n)
 </template>
 
 <style scoped>
+:deep(.v-app-bar-title) {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
 .modern-card {
   border-radius: 12px;
   border: 1px solid rgba(0, 0, 0, 0.08);
