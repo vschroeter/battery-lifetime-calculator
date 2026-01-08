@@ -67,7 +67,10 @@ function handleNameUpdate(id: string, value: string) {
         v-for="phase in deepSleepPhases"
         :key="phase.id"
         class="phase-card modern-card"
+        :class="{ 'phase-card-highlighted': store.hoveredPhaseId === phase.id }"
         elevation="1"
+        @mouseenter="store.setHoveredPhase(phase.id)"
+        @mouseleave="store.setHoveredPhase(null)"
       >
         <v-card-title class="d-flex align-center ga-2 pa-3 pb-2">
           <div
@@ -140,7 +143,10 @@ function handleNameUpdate(id: string, value: string) {
         v-for="phase in nonDeepSleepPhases"
         :key="phase.id"
         class="phase-card modern-card"
+        :class="{ 'phase-card-highlighted': store.hoveredPhaseId === phase.id }"
         elevation="1"
+        @mouseenter="store.setHoveredPhase(phase.id)"
+        @mouseleave="store.setHoveredPhase(null)"
       >
         <v-card-title class="d-flex justify-space-between align-center pa-3 pb-2">
           <div class="d-flex align-center ga-2 flex-grow-1">
@@ -320,11 +326,16 @@ function handleNameUpdate(id: string, value: string) {
 }
 
 .phase-card {
-  transition: box-shadow 0.2s ease;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .phase-card:hover {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+.phase-card-highlighted {
+  border-color: rgba(var(--v-theme-primary), 0.5) !important;
+  box-shadow: 0 4px 12px rgba(var(--v-theme-primary), 0.2) !important;
 }
 
 .phase-title-editable {

@@ -7,7 +7,7 @@ export function usePhaseColors() {
 
   /**
    * Get the color for a phase based on its position in the phases array.
-   * Non-DeepSleep phases get colors from the color array based on their index
+   * Non-DeepSleep phases get colors from the interpolateYlGnBu color scheme based on their index
    * (excluding DeepSleep phases). DeepSleep phases always get the gray color.
    */
   function getPhaseColor(phase: Phase): string {
@@ -20,10 +20,10 @@ export function usePhaseColors() {
     const index = nonDeepSleepPhases.findIndex((p) => p.id === phase.id)
 
     if (index === -1) {
-      return getPhaseColorByIndex(0) // Fallback to first color
+      return getPhaseColorByIndex(0, 1) // Fallback to first color
     }
 
-    return getPhaseColorByIndex(index)
+    return getPhaseColorByIndex(index, nonDeepSleepPhases.length)
   }
 
   return {

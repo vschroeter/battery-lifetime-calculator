@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, watch, ref } from 'vue'
+import * as d3 from 'd3'
 import { useLocale } from '@/composables/useLocale'
 import { useCalculatorStore } from '@/stores/calculator'
-import { getPhaseColorByIndex, DEEP_SLEEP_COLOR, SELF_DISCHARGE_COLOR } from '@/lib/phaseColors'
+import { getColorForPhaseId } from '@/lib/phaseColors'
 import type { PhaseResult } from '@/types/calculator'
 
 interface Props {
@@ -13,8 +14,15 @@ const props = defineProps<Props>()
 const { i18n } = useLocale()
 const store = useCalculatorStore()
 
+const chartContainer = ref<SVGElement | null>(null)
+
 const total = computed(() =>
   props.phaseResults.reduce((sum, r) => sum + r.mAhPerDay, 0),
+)
+
+// Sort phases by share (mAhPerDay) descending
+const sortedPhaseResults = computed(() =>
+  [...props.phaseResults].sort((a, b) => b.mAhPerDay - a.mAhPerDay),
 )
 
 // Get all non-DeepSleep phases to determine color indices
@@ -22,66 +30,186 @@ const nonDeepSleepPhases = computed(() =>
   store.phases.filter((p) => !p.isDeepSleep),
 )
 
+// Chart dimensions
+const width = 200
+const height = 200
+const centerX = width / 2
+const centerY = height / 2
+
+// Widths for different phase types
+const ACTIVE_WIDTH = 40 // Thickest
+const SELF_DISCHARGE_WIDTH = 30 // Medium
+const DEEPSLEEP_WIDTH = 20 // Thinnest
+
+// Outer radius (same for all)
+const outerRadius = Math.min(width, height) / 2
+
+function getPhaseType(result: PhaseResult): 'active' | 'self-discharge' | 'deepsleep' {
+  if (result.phaseId === 'self-discharge-virtual') {
+    return 'self-discharge'
+  }
+  const phase = store.phases.find((p) => p.id === result.phaseId)
+  if (phase?.isDeepSleep) {
+    return 'deepsleep'
+  }
+  return 'active'
+}
+
+function getInnerRadius(phaseType: 'active' | 'self-discharge' | 'deepsleep'): number {
+  switch (phaseType) {
+    case 'active':
+      return outerRadius - ACTIVE_WIDTH
+    case 'self-discharge':
+      return outerRadius - SELF_DISCHARGE_WIDTH
+    case 'deepsleep':
+      return outerRadius - DEEPSLEEP_WIDTH
+  }
+}
+
+function getColorForPhaseResult(result: PhaseResult): string {
+  const phase = store.phases.find((p) => p.id === result.phaseId)
+  const nonDeepSleepPhaseIds = nonDeepSleepPhases.value.map((p) => p.id)
+  
+  return getColorForPhaseId(
+    result.phaseId,
+    nonDeepSleepPhaseIds,
+    phase?.isDeepSleep ?? false,
+  )
+}
+
+function renderChart() {
+  if (!chartContainer.value || total.value === 0) {
+    return
+  }
+
+  // Clear previous content
+  d3.select(chartContainer.value).selectAll('*').remove()
+
+  const svg = d3.select(chartContainer.value)
+
+  // Create pie generator
+  const pie = d3
+    .pie<PhaseResult>()
+    .value((d) => d.mAhPerDay)
+    .sort(null)
+    .padAngle(0.01) // Small gap between segments
+
+  const pieData = pie(sortedPhaseResults.value)
+
+  // Create arc generators for each phase type
+  const activeArc = d3
+    .arc<d3.PieArcDatum<PhaseResult>>()
+    .innerRadius(getInnerRadius('active'))
+    .outerRadius(outerRadius)
+
+  const selfDischargeArc = d3
+    .arc<d3.PieArcDatum<PhaseResult>>()
+    .innerRadius(getInnerRadius('self-discharge'))
+    .outerRadius(outerRadius)
+
+  const deepsleepArc = d3
+    .arc<d3.PieArcDatum<PhaseResult>>()
+    .innerRadius(getInnerRadius('deepsleep'))
+    .outerRadius(outerRadius)
+
+  function getArc(d: d3.PieArcDatum<PhaseResult>) {
+    const phaseType = getPhaseType(d.data)
+    switch (phaseType) {
+      case 'active':
+        return activeArc
+      case 'self-discharge':
+        return selfDischargeArc
+      case 'deepsleep':
+        return deepsleepArc
+    }
+  }
+
+  // Create groups for each arc
+  const arcs = svg
+    .selectAll('g.arc')
+    .data(pieData)
+    .enter()
+    .append('g')
+    .attr('class', 'arc')
+    .attr('transform', `translate(${centerX},${centerY})`)
+
+  // Draw arcs
+  arcs
+    .append('path')
+    .attr('d', (d) => getArc(d)?.(d) ?? '')
+    .attr('fill', (d) => getColorForPhaseResult(d.data))
+    .attr('stroke', 'white')
+    .attr('stroke-width', 1)
+    .attr('class', (d) => `arc-path arc-${d.data.phaseId}`)
+    .attr('data-phase-id', (d) => d.data.phaseId)
+    .style('cursor', 'pointer')
+    .style('transition', 'opacity 0.2s ease')
+    .style('opacity', (d) => {
+      if (store.hoveredPhaseId === null) {
+        return 1
+      }
+      return store.hoveredPhaseId === d.data.phaseId ? 1 : 0.3
+    })
+    .on('mouseenter', function (event, d) {
+      store.setHoveredPhase(d.data.phaseId)
+    })
+    .on('mouseleave', function () {
+      store.setHoveredPhase(null)
+    })
+}
+
+function updateArcStyles() {
+  if (!chartContainer.value) {
+    return
+  }
+  const svg = d3.select(chartContainer.value)
+  svg.selectAll<SVGPathElement, d3.PieArcDatum<PhaseResult>>('path.arc-path').style('opacity', function (d) {
+    if (store.hoveredPhaseId === null) {
+      return 1
+    }
+    return store.hoveredPhaseId === d.data.phaseId ? 1 : 0.3
+  })
+}
+
+onMounted(() => {
+  renderChart()
+})
+
+watch(
+  () => props.phaseResults,
+  () => {
+    renderChart()
+  },
+  { deep: true, immediate: false },
+)
+
+watch(
+  () => total.value,
+  () => {
+    renderChart()
+  },
+)
+
+watch(
+  () => store.hoveredPhaseId,
+  () => {
+    updateArcStyles()
+  },
+)
+
 const segments = computed(() => {
   if (total.value === 0) {
     return []
   }
 
-  let currentAngle = 0
-  return props.phaseResults.map((result) => {
+  return sortedPhaseResults.value.map((result) => {
     const percentage = (result.mAhPerDay / total.value) * 100
-    const angle = (percentage / 100) * 360
-    const startAngle = currentAngle
-    currentAngle += angle
-
     return {
       ...result,
       percentage,
-      startAngle,
-      angle,
     }
   })
 })
-
-function getColorForPhaseResult(result: PhaseResult): string {
-  // Check if this is the self-discharge virtual phase
-  if (result.phaseId === 'self-discharge-virtual') {
-    return SELF_DISCHARGE_COLOR
-  }
-
-  // Check if this is a DeepSleep phase by looking it up in the store
-  const phase = store.phases.find((p) => p.id === result.phaseId)
-
-  if (phase?.isDeepSleep) {
-    return DEEP_SLEEP_COLOR
-  }
-
-  // For non-DeepSleep phases, find the index among non-DeepSleep phases
-  const phaseIndex = nonDeepSleepPhases.value.findIndex(
-    (p) => p.id === result.phaseId,
-  )
-
-  if (phaseIndex === -1) {
-    return getPhaseColorByIndex(0) // Fallback
-  }
-
-  return getPhaseColorByIndex(phaseIndex)
-}
-
-function getConicGradient() {
-  if (segments.value.length === 0) {
-    return 'conic-gradient(grey 0deg 360deg)'
-  }
-
-  const stops = segments.value.map((seg) => {
-    const color = getColorForPhaseResult(seg)
-    const start = seg.startAngle
-    const end = seg.startAngle + seg.angle
-    return `${color} ${start}deg ${end}deg`
-  })
-
-  return `conic-gradient(${stops.join(', ')})`
-}
 </script>
 
 <template>
@@ -91,15 +219,23 @@ function getConicGradient() {
     </v-card-title>
     <v-card-text class="pa-3 pt-2">
       <div v-if="total > 0" class="d-flex align-center ga-4">
-        <div
+        <svg
+          ref="chartContainer"
+          :width="width"
+          :height="height"
           class="donut-chart"
-          :style="{ background: getConicGradient() }"
         />
         <div class="flex-grow-1">
           <div
             v-for="seg in segments"
             :key="seg.phaseId"
-            class="d-flex align-center mb-2"
+            class="d-flex align-center mb-2 legend-entry"
+            :class="{ 'legend-entry-highlighted': store.hoveredPhaseId === seg.phaseId }"
+            :style="{
+              opacity: store.hoveredPhaseId === null || store.hoveredPhaseId === seg.phaseId ? 1 : 0.3,
+            }"
+            @mouseenter="store.setHoveredPhase(seg.phaseId)"
+            @mouseleave="store.setHoveredPhase(null)"
           >
             <div
               class="legend-color"
@@ -127,24 +263,7 @@ function getConicGradient() {
   border: 1px solid rgba(0, 0, 0, 0.08);
 }
 .donut-chart {
-  width: 200px;
-  height: 200px;
-  border-radius: 50%;
-  background: conic-gradient(grey 0deg 360deg);
-  position: relative;
   flex-shrink: 0;
-}
-
-.donut-chart::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 60%;
-  height: 60%;
-  background: white;
-  border-radius: 50%;
 }
 
 .legend-color {
@@ -152,6 +271,17 @@ function getConicGradient() {
   height: 16px;
   border-radius: 2px;
   flex-shrink: 0;
+}
+
+.legend-entry {
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.legend-entry-highlighted {
+  background-color: rgba(0, 0, 0, 0.05);
 }
 </style>
 

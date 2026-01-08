@@ -39,6 +39,8 @@ export const useCalculatorStore = defineStore('calculator', () => {
     },
   ])
 
+  const hoveredPhaseId = ref<string | null>(null)
+
   // Getters
   const state = computed<CalculatorState>(() => ({
     battery: battery.value,
@@ -105,9 +107,14 @@ export const useCalculatorStore = defineStore('calculator', () => {
     ]
   }
 
+  function setHoveredPhase(id: string | null) {
+    hoveredPhaseId.value = id
+  }
+
   return {
     battery,
     phases,
+    hoveredPhaseId,
     state,
     updateBattery,
     addPhase,
@@ -115,6 +122,7 @@ export const useCalculatorStore = defineStore('calculator', () => {
     removePhase,
     removeAllPhases,
     resetToESP32Preset,
+    setHoveredPhase,
   }
 })
 

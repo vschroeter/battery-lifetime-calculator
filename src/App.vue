@@ -38,7 +38,7 @@ provide('i18n', i18n)
     </v-app-bar>
 
     <v-main>
-      <v-container fluid class="pa-4 pa-md-6">
+      <v-container class="pa-4 pa-md-6">
         <v-row>
           <v-col cols="12" md="6" class="mb-4 mb-md-0">
             <v-card class="modern-card" elevation="1">

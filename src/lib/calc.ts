@@ -13,7 +13,7 @@ import {
 
 const SECONDS_PER_DAY = 86400
 const DAYS_PER_WEEK = 7
-const DAYS_PER_MONTH = 30.44
+const DAYS_PER_MONTH = 30.4368491667 // From tropical year having 365.24219 days
 const MONTHS_PER_YEAR = 12
 
 /**
@@ -227,16 +227,38 @@ export function calculate(
     const k = -Math.log(1 - selfDischargeRate) / DAYS_PER_MONTH
 
     if (loadConsumption_mAhPerDay > 0) {
-      // Combined load + self-discharge: Q(t) = Q0 * e^(-k*t) - (L/k) * (1 - e^(-k*t))
-      // Solve for t when Q(t) = 0:
-      // Q0 * e^(-k*t) = (L/k) * (1 - e^(-k*t))
-      // Q0 * e^(-k*t) = (L/k) - (L/k) * e^(-k*t)
-      // e^(-k*t) * (Q0 + L/k) = L/k
-      // e^(-k*t) = L / (k*Q0 + L)
-      // -k*t = ln(L / (k*Q0 + L))
-      // t = -ln(L / (k*Q0 + L)) / k
-      // t = ln((k*Q0 + L) / L) / k
-      // t = (1/k) * ln(1 + k*Q0/L)
+      // Capacity model with BOTH effects:
+      //   1) self-discharge proportional to remaining charge: dQ/dt = -k*Q
+      //   2) constant load draw (e.g. average mAh/day):        dQ/dt = -L
+      // Combined ODE: dQ/dt = -k*Q - L
+      //
+      // Closed-form solution (remaining capacity after t days):
+      //   Q(t) = Q0 * e^(-k*t) - (L/k) * (1 - e^(-k*t))
+      //        = (Q0 + L/k) * e^(-k*t) - L/k
+      //
+      // We want the "time to empty" (Q(t) = 0). Algebra:
+      //
+      //   0 = (Q0 + L/k) * e^(-k*t) - L/k
+      //   (Q0 + L/k) * e^(-k*t) = L/k
+      //   e^(-k*t) = (L/k) / (Q0 + L/k) = L / (k*Q0 + L)
+      //
+      // Take ln on both sides:
+      //
+      //   -k*t = ln( L / (k*Q0 + L) )
+      //
+      // Solve for t (positive result):
+      //
+      //   t = -ln( L / (k*Q0 + L) ) / k
+      //     =  ln( (k*Q0 + L) / L ) / k
+      //     = (1/k) * ln( 1 + (k*Q0)/L )
+      //
+      // Units sanity check:
+      //   Q0 in mAh, L in mAh/day, k in 1/day -> (k*Q0)/L is dimensionless, t is in days.
+      //
+      // Notes / edge cases:
+      //   - If k -> 0 (no self-discharge), limit becomes t -> Q0 / L (pure linear drain).
+      //   - If L <= 0, "time to empty" is undefined (no consumption / charging).
+      //   - This model assumes L is constant and self-discharge rate k stays constant over time.
       runtimeDays = (1 / k) * Math.log(1 + (k * usableCapacity_mAh) / loadConsumption_mAhPerDay)
 
       // Calculate effective average self-discharge mAh/day for reporting
