@@ -1,6 +1,6 @@
 # Battery Lifetime Calculator
 
-Public app: `https://vschroeter.github.io/battery-lifetime-calculator/`
+Public app: [https://vschroeter.github.io/battery-lifetime-calculator/](https://vschroeter.github.io/battery-lifetime-calculator/)
 
 A small web tool to estimate **battery lifetime of microcontroller / IoT devices** from a realistic load profile (sleep + periodic active phases). It helps you answer questions like:
 
