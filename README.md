@@ -28,7 +28,6 @@ The calculator turns this into an **average current** and **consumption per day*
    - Set each phase’s current, duration, and frequency.
    - DeepSleep is treated as the remaining time in the day after all active phases.
 3. (Optional) Add **leakage currents** (permanent loads) to the total load calculation.
-4. Click **Calculate** to refresh results.
 5. (Optional) Use **Export** to share or archive a configuration/results snapshot.
 
 ## Local development
