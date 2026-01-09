@@ -8,7 +8,7 @@ A small web tool to estimate **battery lifetime of microcontroller / IoT devices
 - Which phase dominates my consumption (TX vs sensor vs sleep)?
 - What happens if I reduce TX frequency or shorten wake time?
 
-![Battery Lifetime Calculator Screenshot](docs/Screenshot1.png)
+![Battery Lifetime Calculator Screenshot](docs/Screenshot_20260109.png)
 
 ## How it works (concept)
 
@@ -27,8 +27,9 @@ The calculator turns this into an **average current** and **consumption per day*
    - Add phases like Sensor, TX, GPS, etc.
    - Set each phase’s current, duration, and frequency.
    - DeepSleep is treated as the remaining time in the day after all active phases.
-3. Click **Calculate** to refresh results.
-4. (Optional) Use **Export** to share or archive a configuration/results snapshot.
+3. (Optional) Add **leakage currents** (permanent loads) to the total load calculation.
+4. Click **Calculate** to refresh results.
+5. (Optional) Use **Export** to share or archive a configuration/results snapshot.
 
 ## Local development
 
