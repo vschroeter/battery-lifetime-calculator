@@ -12,6 +12,8 @@ export function convertCurrentTo_mA(
   unit: CurrentUnit,
 ): number {
   switch (unit) {
+    case 'nA':
+      return value / 1000000
     case 'µA':
       return value / 1000
     case 'mA':

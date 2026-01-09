@@ -1,4 +1,4 @@
-export type CurrentUnit = 'µA' | 'mA' | 'A'
+export type CurrentUnit = 'nA' | 'µA' | 'mA' | 'A'
 export type DurationUnit = 'ms' | 's' | 'min' | 'h'
 export type FrequencyUnit = 'perHour' | 'perDay' | 'perWeek'
 
@@ -20,9 +20,17 @@ export interface Phase {
   frequencyUnit: FrequencyUnit
 }
 
+export interface LeakageCurrent {
+  id: string
+  label: string
+  current: number
+  currentUnit: CurrentUnit
+}
+
 export interface CalculatorState {
   battery: BatteryConfig
   phases: Phase[]
+  leakageCurrents: LeakageCurrent[]
 }
 
 export interface PhaseResult {

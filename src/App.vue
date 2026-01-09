@@ -254,7 +254,8 @@ provide('i18n', i18n)
   display: flex;
   flex-direction: column;
   padding: 0 0 0 6px;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* Scroll panes - critical for independent scrolling */

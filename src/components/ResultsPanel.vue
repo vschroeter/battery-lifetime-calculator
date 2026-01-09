@@ -14,7 +14,7 @@ const calculationResult = computed(() => {
   if (!shouldCalculate.value) {
     return null
   }
-  return calculate(store.battery, store.phases)
+  return calculate(store.battery, store.phases, store.leakageCurrents)
 })
 
 function triggerCalculation() {
@@ -23,7 +23,7 @@ function triggerCalculation() {
 
 // Auto-calculate on changes (live update)
 const autoCalculation = computed(() => {
-  return calculate(store.battery, store.phases)
+  return calculate(store.battery, store.phases, store.leakageCurrents)
 })
 
 const displayResult = computed(() => {
@@ -37,6 +37,7 @@ const displayResult = computed(() => {
       <span class="text-h6">{{ i18n.t('results') }}</span>
       <div class="d-flex ga-2">
         <v-btn
+          v-if="false"
           color="primary"
           prepend-icon="mdi-calculator"
           density="compact"
@@ -211,12 +212,10 @@ const displayResult = computed(() => {
   border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
-/* Results card layout for scroll pane */
+/* Results card layout */
 .results-card {
-  height: 100%;
   display: flex;
   flex-direction: column;
-  min-height: 0;
 }
 
 .results-card-header {
@@ -224,10 +223,7 @@ const displayResult = computed(() => {
 }
 
 .results-card-content {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
+  flex-shrink: 0;
 }
 
 .result-tile {

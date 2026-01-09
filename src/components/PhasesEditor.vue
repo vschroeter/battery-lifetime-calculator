@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useCalculatorStore } from '@/stores/calculator'
 import { useLocale } from '@/composables/useLocale'
 import { usePhaseColors } from '@/composables/usePhaseColors'
+import LeakageCurrentsPanel from '@/components/LeakageCurrentsPanel.vue'
 import type { Phase, CurrentUnit, DurationUnit } from '@/types/calculator'
 
 const store = useCalculatorStore()
@@ -61,6 +62,9 @@ function handleNameUpdate(id: string, value: string) {
 <template>
   <div>
 
+    <!-- Leakage Currents Panel -->
+    <LeakageCurrentsPanel />
+
     <!-- DeepSleep Phase (special handling) -->
     <div v-if="deepSleepPhases.length > 0" class="mb-3">
       <v-card
@@ -72,31 +76,44 @@ function handleNameUpdate(id: string, value: string) {
         @mouseenter="store.setHoveredPhase(phase.id)"
         @mouseleave="store.setHoveredPhase(null)"
       >
-        <v-card-title class="d-flex align-center ga-2 pa-3 pb-2">
-          <div
-            class="phase-color-indicator"
-            :style="{ backgroundColor: getPhaseColor(phase) }"
-          />
-          <div
-            v-if="editingPhaseId !== phase.id"
-            class="phase-title-editable"
-            @dblclick="startEditing(phase.id)"
-          >
-            {{ phase.name || 'Unnamed Phase' }}
+        <v-card-title class="d-flex justify-space-between align-center pa-3 pb-2">
+          <div class="d-flex align-center ga-2 flex-grow-1">
+            <div
+              class="phase-color-indicator"
+              :style="{ backgroundColor: getPhaseColor(phase) }"
+            />
+            <div
+              v-if="editingPhaseId !== phase.id"
+              class="phase-title-editable"
+              @dblclick="startEditing(phase.id)"
+            >
+              {{ phase.name || 'Unnamed Phase' }}
+            </div>
+            <v-text-field
+              v-else
+              :model-value="phase.name"
+              variant="plain"
+              density="compact"
+              hide-details
+              autofocus
+              class="phase-title-input"
+              @update:model-value="handleNameUpdate(phase.id, $event)"
+              @blur="stopEditing"
+              @keydown.enter.prevent="stopEditing"
+              @keydown.esc="stopEditing"
+            />
           </div>
-          <v-text-field
-            v-else
-            :model-value="phase.name"
-            variant="plain"
-            density="compact"
-            hide-details
-            autofocus
-            class="phase-title-input"
-            @update:model-value="handleNameUpdate(phase.id, $event)"
-            @blur="stopEditing"
-            @keydown.enter.prevent="stopEditing"
-            @keydown.esc="stopEditing"
-          />
+          <v-tooltip location="top">
+            <template #activator="{ props: tooltipProps }">
+              <v-icon
+                icon="mdi-information-outline"
+                size="small"
+                color="info"
+                v-bind="tooltipProps"
+              />
+            </template>
+            <span>{{ i18n.t('deepSleepHint') }}</span>
+          </v-tooltip>
         </v-card-title>
         <v-card-text class="pa-3 pt-2">
           <div class="d-flex flex-column ga-2">
@@ -129,9 +146,6 @@ function handleNameUpdate(id: string, value: string) {
                 <v-btn value="A" size="small">A</v-btn>
               </v-btn-toggle>
             </div>
-            <v-alert type="info" variant="tonal" density="compact" class="mt-1">
-              {{ i18n.t('deepSleepAutoCalculated') }}
-            </v-alert>
           </div>
         </v-card-text>
       </v-card>

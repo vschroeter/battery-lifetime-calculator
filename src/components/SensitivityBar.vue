@@ -14,7 +14,7 @@ const activePhase = computed(() => {
 
 const baseResult = computed(() => {
   if (!activePhase.value) return null
-  return calculate(store.battery, store.phases)
+  return calculate(store.battery, store.phases, store.leakageCurrents)
 })
 
 const sensitivityResults = computed(() => {
@@ -37,7 +37,7 @@ const sensitivityResults = computed(() => {
       return p
     })
 
-    const result = calculate(store.battery, modifiedPhases)
+    const result = calculate(store.battery, modifiedPhases, store.leakageCurrents)
     if (result.errors.length === 0) {
       const runtimeChange = ((result.runtimeDays - baseRuntime) / baseRuntime) * 100
       results.push({

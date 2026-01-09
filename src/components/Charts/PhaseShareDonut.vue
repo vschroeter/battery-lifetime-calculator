@@ -39,14 +39,18 @@ const centerY = height / 2
 // Widths for different phase types
 const ACTIVE_WIDTH = 40 // Thickest
 const SELF_DISCHARGE_WIDTH = 30 // Medium
+const LEAKAGE_CURRENT_WIDTH = 25 // Between deep sleep and active
 const DEEPSLEEP_WIDTH = 20 // Thinnest
 
 // Outer radius (same for all)
 const outerRadius = Math.min(width, height) / 2
 
-function getPhaseType(result: PhaseResult): 'active' | 'self-discharge' | 'deepsleep' {
+function getPhaseType(result: PhaseResult): 'active' | 'self-discharge' | 'leakage-current' | 'deepsleep' {
   if (result.phaseId === 'self-discharge-virtual') {
     return 'self-discharge'
+  }
+  if (result.phaseId === 'leakage-currents-virtual') {
+    return 'leakage-current'
   }
   const phase = store.phases.find((p) => p.id === result.phaseId)
   if (phase?.isDeepSleep) {
@@ -55,18 +59,29 @@ function getPhaseType(result: PhaseResult): 'active' | 'self-discharge' | 'deeps
   return 'active'
 }
 
-function getInnerRadius(phaseType: 'active' | 'self-discharge' | 'deepsleep'): number {
+function getInnerRadius(phaseType: 'active' | 'self-discharge' | 'leakage-current' | 'deepsleep'): number {
   switch (phaseType) {
     case 'active':
       return outerRadius - ACTIVE_WIDTH
     case 'self-discharge':
       return outerRadius - SELF_DISCHARGE_WIDTH
+    case 'leakage-current':
+      return outerRadius - LEAKAGE_CURRENT_WIDTH
     case 'deepsleep':
       return outerRadius - DEEPSLEEP_WIDTH
   }
 }
 
 function getColorForPhaseResult(result: PhaseResult): string {
+  // Handle virtual phases (leakage currents, self-discharge)
+  if (result.phaseId === 'leakage-currents-virtual' || result.phaseId === 'self-discharge-virtual') {
+    return getColorForPhaseId(
+      result.phaseId,
+      nonDeepSleepPhases.value.map((p) => p.id),
+      false, // Not a DeepSleep phase
+    )
+  }
+
   const phase = store.phases.find((p) => p.id === result.phaseId)
   const nonDeepSleepPhaseIds = nonDeepSleepPhases.value.map((p) => p.id)
 
@@ -92,25 +107,35 @@ function renderChart() {
     .pie<PhaseResult>()
     .value((d) => d.mAhPerDay)
     .sort(null)
-    .padAngle(0.01) // Small gap between segments
+    .padAngle(0.05 / sortedPhaseResults.value.length) // Small gap between segments
 
   const pieData = pie(sortedPhaseResults.value)
+
+  // const cornerRadius = 10 / sortedPhaseResults.value.length;
+  const cornerRadius = 2;
 
   // Create arc generators for each phase type
   const activeArc = d3
     .arc<d3.PieArcDatum<PhaseResult>>()
     .innerRadius(getInnerRadius('active'))
     .outerRadius(outerRadius)
+    .cornerRadius(cornerRadius)
 
   const selfDischargeArc = d3
     .arc<d3.PieArcDatum<PhaseResult>>()
     .innerRadius(getInnerRadius('self-discharge'))
     .outerRadius(outerRadius)
-
+    .cornerRadius(cornerRadius)
+  const leakageCurrentArc = d3
+    .arc<d3.PieArcDatum<PhaseResult>>()
+    .innerRadius(getInnerRadius('leakage-current'))
+    .outerRadius(outerRadius)
+    .cornerRadius(cornerRadius)
   const deepsleepArc = d3
     .arc<d3.PieArcDatum<PhaseResult>>()
     .innerRadius(getInnerRadius('deepsleep'))
     .outerRadius(outerRadius)
+    .cornerRadius(cornerRadius)
 
   function getArc(d: d3.PieArcDatum<PhaseResult>) {
     const phaseType = getPhaseType(d.data)
@@ -119,6 +144,8 @@ function renderChart() {
         return activeArc
       case 'self-discharge':
         return selfDischargeArc
+      case 'leakage-current':
+        return leakageCurrentArc
       case 'deepsleep':
         return deepsleepArc
     }

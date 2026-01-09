@@ -4,6 +4,7 @@ import type {
   BatteryConfig,
   Phase,
   CalculatorState,
+  LeakageCurrent,
 } from '@/types/calculator'
 
 export const useCalculatorStore = defineStore('calculator', () => {
@@ -41,10 +42,13 @@ export const useCalculatorStore = defineStore('calculator', () => {
 
   const hoveredPhaseId = ref<string | null>(null)
 
+  const leakageCurrents = ref<LeakageCurrent[]>([])
+
   // Getters
   const state = computed<CalculatorState>(() => ({
     battery: battery.value,
     phases: phases.value,
+    leakageCurrents: leakageCurrents.value,
   }))
 
   // Actions
@@ -105,16 +109,41 @@ export const useCalculatorStore = defineStore('calculator', () => {
         frequencyUnit: 'perHour',
       },
     ]
+    leakageCurrents.value = []
   }
 
   function setHoveredPhase(id: string | null) {
     hoveredPhaseId.value = id
   }
 
+  function addLeakageCurrent(leakage: Omit<LeakageCurrent, 'id'>) {
+    const newLeakage: LeakageCurrent = {
+      ...leakage,
+      id: `leakage-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    }
+    leakageCurrents.value.push(newLeakage)
+  }
+
+  function updateLeakageCurrent(id: string, updates: Partial<LeakageCurrent>) {
+    const index = leakageCurrents.value.findIndex((l) => l.id === id)
+    if (index !== -1) {
+      leakageCurrents.value[index] = { ...leakageCurrents.value[index]!, ...updates }
+    }
+  }
+
+  function removeLeakageCurrent(id: string) {
+    leakageCurrents.value = leakageCurrents.value.filter((l) => l.id !== id)
+  }
+
+  function removeAllLeakageCurrents() {
+    leakageCurrents.value = []
+  }
+
   return {
     battery,
     phases,
     hoveredPhaseId,
+    leakageCurrents,
     state,
     updateBattery,
     addPhase,
@@ -123,6 +152,10 @@ export const useCalculatorStore = defineStore('calculator', () => {
     removeAllPhases,
     resetToESP32Preset,
     setHoveredPhase,
+    addLeakageCurrent,
+    updateLeakageCurrent,
+    removeLeakageCurrent,
+    removeAllLeakageCurrents,
   }
 })
 

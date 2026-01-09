@@ -6,6 +6,7 @@ import * as d3 from 'd3'
 
 export const DEEP_SLEEP_COLOR = '#9e9e9e'
 export const SELF_DISCHARGE_COLOR = '#ff9800'
+export const LEAKAGE_CURRENT_COLOR = '#f44336' // Red color
 export const UNDEFINED_COLOR = '#000000'
 
 /**
@@ -54,6 +55,11 @@ export function getColorForPhaseId(
   // Check if this is the self-discharge virtual phase
   if (phaseId === 'self-discharge-virtual') {
     return SELF_DISCHARGE_COLOR
+  }
+
+  // Check if this is a leakage current virtual phase
+  if (phaseId === 'leakage-currents-virtual') {
+    return LEAKAGE_CURRENT_COLOR
   }
 
   // Check if this is a DeepSleep phase

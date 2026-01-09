@@ -3,6 +3,7 @@ import type {
   BatteryConfig,
   PhaseResult,
   CalculationResult,
+  LeakageCurrent,
 } from '@/types/calculator'
 import {
   convertCurrentTo_mA,
@@ -114,6 +115,7 @@ function calculateDeepSleepConsumption(
 export function calculate(
   battery: BatteryConfig,
   phases: Phase[],
+  leakageCurrents: LeakageCurrent[] = [],
 ): CalculationResult {
   const errors: string[] = []
   const warnings: string[] = []
@@ -202,7 +204,26 @@ export function calculate(
     totalActiveTimeSeconds += result.activeTimePerDaySeconds
   }
 
-  // Calculate load consumption from phases
+  // Calculate leakage current consumption (permanent load, 24 hours per day)
+  const leakageConsumption_mAhPerDay = leakageCurrents.reduce((sum, leakage) => {
+    const current_mA = convertCurrentTo_mA(leakage.current, leakage.currentUnit)
+    // Permanent load: current * 24 hours
+    return sum + current_mA * 24
+  }, 0)
+
+  // Add leakage currents as a virtual phase result if present
+  if (leakageConsumption_mAhPerDay > 0.001) {
+    const leakageLabels = leakageCurrents.map((l) => l.label || '').join(', ')
+    phaseResults.push({
+      phaseId: 'leakage-currents-virtual',
+      phaseName: `Sum of Leakage Currents${leakageLabels ? ` (${leakageLabels})` : ''}`,
+      mAhPerDay: leakageConsumption_mAhPerDay,
+      eventsPerDay: 0,
+      activeTimePerDaySeconds: SECONDS_PER_DAY, // 24 hours
+    })
+  }
+
+  // Calculate load consumption from phases and leakage currents
   const loadConsumption_mAhPerDay = phaseResults.reduce(
     (sum, r) => sum + r.mAhPerDay,
     0,
