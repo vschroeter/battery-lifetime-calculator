@@ -5,6 +5,7 @@ import type {
   CalculationResult,
   LeakageCurrent,
 } from '@/types/calculator'
+import { isLegal } from '@/lib/fields'
 import {
   convertCurrentTo_mA,
   convertDurationToHours,
@@ -120,13 +121,13 @@ export function calculate(
   const warnings: string[] = []
 
   // Validate battery
-  if (battery.capacity_mAh <= 0) {
+  if (!isLegal('positive', battery.capacity_mAh)) {
     errors.push('Battery capacity must be greater than 0')
   }
-  if (battery.usablePercent < 1 || battery.usablePercent > 100) {
+  if (!isLegal('usableRange', battery.usablePercent)) {
     errors.push('Usable capacity percentage must be between 1 and 100')
   }
-  if (battery.selfDischargePercentPerMonth < 0 || battery.selfDischargePercentPerMonth >= 100) {
+  if (!isLegal('selfDischargeRange', battery.selfDischargePercentPerMonth)) {
     errors.push('Self-discharge rate must be between 0 and 100 (exclusive)')
   }
 
@@ -135,25 +136,24 @@ export function calculate(
     errors.push('Exactly one DeepSleep phase is required.')
   }
 
-  // Validate phases
+  // Validate phases. Current may be 0. Duration and frequency may not.
   for (const phase of phases) {
-    const currentIsValid = phase.isDeepSleep ? phase.current >= 0 : phase.current > 0
-    if (!currentIsValid) {
-      errors.push(
-        phase.isDeepSleep
-          ? `Phase "${phase.name}": Current must be greater than or equal to 0`
-          : `Phase "${phase.name}": Current must be greater than 0`,
-      )
+    if (!isLegal('nonNegative', phase.current)) {
+      errors.push(`Phase "${phase.name}": Current must be greater than or equal to 0`)
     }
     if (!phase.isDeepSleep) {
-      if (phase.duration <= 0) {
+      if (!isLegal('positive', phase.duration)) {
         errors.push(`Phase "${phase.name}": Duration must be greater than 0`)
       }
-      if (!phase.frequency || phase.frequency <= 0) {
-        errors.push(
-          `Phase "${phase.name}": Frequency must be greater than 0`,
-        )
+      if (!isLegal('positive', phase.frequency)) {
+        errors.push(`Phase "${phase.name}": Frequency must be greater than 0`)
       }
+    }
+  }
+
+  for (const leakage of leakageCurrents) {
+    if (!isLegal('nonNegative', leakage.current)) {
+      errors.push(`Leakage "${leakage.label}": Current must be greater than or equal to 0`)
     }
   }
 

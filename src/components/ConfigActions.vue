@@ -3,7 +3,6 @@ import { computed, ref } from 'vue'
 import { useDisplay } from 'vuetify'
 import { useCalculatorStore } from '@/stores/calculator'
 import { useLocale } from '@/composables/useLocale'
-import { calculate } from '@/lib/calc'
 import { exportConfigAsJSON, exportResultsAsCSV, type CsvLabels } from '@/lib/export'
 import { ConfigImportError, importConfigFromJSON, type ImportNotice, type ImportResult } from '@/lib/import'
 import ConfigActionsMenu from '@/components/ConfigActionsMenu.vue'
@@ -19,12 +18,13 @@ const isImportAlertVisible = ref(false)
 const isReplaceDialogVisible = ref(false)
 const pendingImport = ref<ImportResult | null>(null)
 
-const displayResult = computed(() =>
-  calculate(store.battery, store.phases, store.leakageCurrents),
-)
+const displayResult = computed(() => store.presentation.result)
 
 const canExportResults = computed(
-  () => displayResult.value.errors.length === 0 && !displayResult.value.dayBudgetExceeded,
+  () =>
+    store.presentation.issues.length === 0 &&
+    displayResult.value !== null &&
+    !displayResult.value.dayBudgetExceeded,
 )
 
 function openImportDialog() {
@@ -63,6 +63,9 @@ function csvLabels(): CsvLabels {
 
 function exportResults() {
   if (!canExportResults.value) {
+    return
+  }
+  if (!displayResult.value) {
     return
   }
   exportResultsAsCSV(displayResult.value, store.battery, csvLabels())

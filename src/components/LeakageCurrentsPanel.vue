@@ -3,10 +3,14 @@ import { computed } from 'vue'
 import { useCalculatorStore } from '@/stores/calculator'
 import { useLocale } from '@/composables/useLocale'
 import { LEAKAGE_CURRENT_COLOR } from '@/lib/phaseColors'
+import NumericField from '@/components/NumericField.vue'
+import { useFieldMessage } from '@/composables/useFieldMessage'
+import { leakageFieldKey } from '@/lib/fields'
 import type { CurrentUnit } from '@/types/calculator'
 
 const store = useCalculatorStore()
 const { i18n } = useLocale()
+const { message } = useFieldMessage()
 
 const leakageCurrents = computed(() => store.leakageCurrents)
 const hasLeakageCurrents = computed(() => leakageCurrents.value.length > 0)
@@ -93,17 +97,12 @@ function updateLeakageCurrent(id: string, updates: Partial<{ label: string; curr
             @mouseleave="store.setHoveredPhase(null)"
           >
 
-            <v-text-field
+            <NumericField
               :model-value="leakage.current"
               :label="i18n.t('current')"
-              type="number"
-              variant="outlined"
-              density="compact"
-              hide-details="auto"
+              :error-message="message(leakageFieldKey(leakage.id))"
               class="leakage-current-field"
-              @update:model-value="
-                updateLeakageCurrent(leakage.id, { current: Number($event) })
-              "
+              @commit="store.commitLeakageCurrent(leakage.id, $event)"
             />
             <v-btn-toggle
               :model-value="leakage.currentUnit"

@@ -2,7 +2,6 @@
 import { computed } from 'vue'
 import { useCalculatorStore } from '@/stores/calculator'
 import { useLocale } from '@/composables/useLocale'
-import { calculate } from '@/lib/calc'
 import {
   formatActiveTime,
   formatChargePerDay,
@@ -15,14 +14,32 @@ import PhaseShareDonut from '@/components/Charts/PhaseShareDonut.vue'
 const store = useCalculatorStore()
 const { i18n } = useLocale()
 
-const displayResult = computed(() =>
-  calculate(store.battery, store.phases, store.leakageCurrents),
-)
+const presentation = computed(() => store.presentation)
+const displayResult = computed(() => presentation.value.result)
 
 const averageCurrent = computed(() =>
-  formatCurrentFromMilliAmps(displayResult.value.averageCurrent_mA),
+  displayResult.value
+    ? formatCurrentFromMilliAmps(displayResult.value.averageCurrent_mA)
+    : null,
 )
-const dailyCharge = computed(() => formatChargePerDay(displayResult.value.totalmAhPerDay))
+const dailyCharge = computed(() =>
+  displayResult.value ? formatChargePerDay(displayResult.value.totalmAhPerDay) : null,
+)
+
+const statusLine = computed(() => {
+  const count = presentation.value.issues.length
+  if (count === 0) {
+    return ''
+  }
+  const key = presentation.value.withheld
+    ? count === 1
+      ? 'resultsWithheldOne'
+      : 'resultsWithheldMany'
+    : count === 1
+      ? 'resultsHeldOne'
+      : 'resultsHeldMany'
+  return i18n.t(key).replace('{count}', String(count))
+})
 
 function eventsLabel(events: number): string {
   return events > 0 ? formatCount(events) : i18n.t('notAvailable')
@@ -48,7 +65,7 @@ function formatBudgetSeconds(seconds: number): string {
 }
 
 const dayBudgetMessage = computed(() => {
-  const seconds = displayResult.value.activeTimePerDaySeconds
+  const seconds = displayResult.value?.activeTimePerDaySeconds ?? 0
   return i18n
     .t('dayBudgetExceeded')
     .replace('{hours}', (seconds / 3600).toFixed(2))
@@ -66,22 +83,17 @@ function isHighlighted(phaseId: string): boolean {
       {{ i18n.t('results') }}
     </v-card-title>
     <v-card-text class="pa-4 pt-2 results-card-content">
-      <div v-if="displayResult">
-        <!-- Errors -->
+      <div>
         <v-alert
-          v-if="displayResult.errors.length > 0"
-          type="error"
+          v-if="statusLine"
+          type="warning"
           variant="tonal"
           class="mb-4"
         >
-          <div class="font-weight-bold mb-2">{{ i18n.t('errors') }}:</div>
-          <ul class="ma-0">
-            <li v-for="(error, idx) in displayResult.errors" :key="idx">
-              {{ error }}
-            </li>
-          </ul>
+          {{ statusLine }}
         </v-alert>
 
+        <template v-if="displayResult">
         <v-alert
           v-if="displayResult.dayBudgetExceeded"
           type="error"
@@ -107,13 +119,13 @@ function isHighlighted(phaseId: string): boolean {
         </v-alert>
 
         <!-- KPIs -->
-        <div v-if="displayResult.errors.length === 0 && !displayResult.dayBudgetExceeded" class="d-flex flex-column ga-3">
+        <div v-if="!displayResult.dayBudgetExceeded" class="d-flex flex-column ga-3">
           <div class="d-flex ga-3 flex-wrap">
             <v-card class="result-tile modern-card flex-grow-1" elevation="1" style="min-width: 200px">
               <v-card-text class="pa-3">
                 <div class="text-body-2 text-medium-emphasis mb-1">{{ i18n.t('averageCurrent') }}</div>
                 <div class="text-h5 font-weight-medium">
-                  {{ averageCurrent.text }} <span class="text-body-1">{{ averageCurrent.unit }}</span>
+                  {{ averageCurrent?.text }} <span class="text-body-1">{{ averageCurrent?.unit }}</span>
                 </div>
               </v-card-text>
             </v-card>
@@ -122,7 +134,7 @@ function isHighlighted(phaseId: string): boolean {
               <v-card-text class="pa-3">
                 <div class="text-body-2 text-medium-emphasis mb-1">{{ i18n.t('consumptionPerDay') }}</div>
                 <div class="text-h5 font-weight-medium">
-                  {{ dailyCharge.text }} <span class="text-body-1">{{ dailyCharge.unit }}</span>
+                  {{ dailyCharge?.text }} <span class="text-body-1">{{ dailyCharge?.unit }}</span>
                 </div>
               </v-card-text>
             </v-card>
@@ -152,7 +164,6 @@ function isHighlighted(phaseId: string): boolean {
         </div>
 
         <div
-          v-if="displayResult.errors.length === 0"
           class="d-flex flex-column ga-3"
           :class="{ 'mt-3': !displayResult.dayBudgetExceeded }"
         >
@@ -208,10 +219,8 @@ function isHighlighted(phaseId: string): boolean {
           </v-card>
 
         </div>
+        </template>
       </div>
-      <v-alert v-else type="info" variant="tonal" density="compact">
-        {{ i18n.t('enterConfigAndCalculate') }}
-      </v-alert>
     </v-card-text>
   </v-card>
 </template>

@@ -203,13 +203,35 @@ describe('day budget', () => {
 
   it('lets a field error hide an over-budget day', () => {
     const result = calculate(battery, [
-      phase({ id: 'a', name: 'A', duration: 13, durationUnit: 'h', current: 0 }),
+      phase({ id: 'a', name: 'A', duration: 13, durationUnit: 'h', current: -1 }),
       phase({ id: 'b', name: 'B', duration: 13, durationUnit: 'h' }),
       sleep,
     ])
 
     expect(result.phaseResults).toEqual([])
     expect(result.dayBudgetExceeded).toBe(false)
+    expect(result.errors.length).toBeGreaterThan(0)
+  })
+
+  it('keeps a zero-current phase in the day budget', () => {
+    const result = calculate(battery, [
+      phase({ id: 'a', name: 'A', duration: 13, durationUnit: 'h', current: 0 }),
+      phase({ id: 'b', name: 'B', duration: 13, durationUnit: 'h' }),
+      sleep,
+    ])
+
+    expect(result.errors).toEqual([])
+    expect(result.dayBudgetExceeded).toBe(true)
+    expect(result.phaseResults.map((row) => row.phaseId)).toEqual(['a', 'b'])
+    expect(result.phaseResults[0]!.mAhPerDay).toBe(0)
+  })
+
+  it('rejects a negative leakage current', () => {
+    const result = calculate(battery, phases, [
+      { id: 'leak', label: 'probe', current: -1, currentUnit: 'µA' },
+    ])
+
+    expect(result.phaseResults).toEqual([])
     expect(result.errors.length).toBeGreaterThan(0)
   })
 })

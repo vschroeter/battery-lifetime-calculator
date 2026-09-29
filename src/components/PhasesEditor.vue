@@ -4,10 +4,14 @@ import { useCalculatorStore } from '@/stores/calculator'
 import { useLocale } from '@/composables/useLocale'
 import { usePhaseColors } from '@/composables/usePhaseColors'
 import LeakageCurrentsPanel from '@/components/LeakageCurrentsPanel.vue'
+import NumericField from '@/components/NumericField.vue'
+import { useFieldMessage } from '@/composables/useFieldMessage'
+import { phaseFieldKey } from '@/lib/fields'
 import type { Phase, CurrentUnit, DurationUnit } from '@/types/calculator'
 
 const store = useCalculatorStore()
 const { i18n } = useLocale()
+const { message } = useFieldMessage()
 const { getPhaseColor } = usePhaseColors()
 
 const editingPhaseId = ref<string | null>(null)
@@ -119,17 +123,12 @@ function isHighlighted(id: string): boolean {
         <v-card-text class="pa-3 pt-2">
           <div class="d-flex flex-column ga-2">
             <div class="d-flex ga-2 align-center">
-              <v-text-field
+              <NumericField
                 :model-value="phase.current"
                 :label="i18n.t('current')"
-                type="number"
-                variant="outlined"
-                density="compact"
-                hide-details="auto"
+                :error-message="message(phaseFieldKey(phase.id, 'current'))"
                 class="flex-grow-1"
-                @update:model-value="
-                  updatePhase(phase.id, { current: Number($event) })
-                "
+                @commit="store.commitPhaseField(phase.id, 'current', $event)"
               />
               <v-btn-toggle
                 :model-value="phase.currentUnit"
@@ -207,18 +206,13 @@ function isHighlighted(id: string): boolean {
           <div class="d-flex flex-column ga-2">
             <!-- Current + Unit -->
             <div class="d-flex ga-2 flex-wrap align-center">
-              <v-text-field
+              <NumericField
                 :model-value="phase.current"
                 :label="i18n.t('current')"
-                type="number"
-                variant="outlined"
-                density="compact"
-                hide-details="auto"
+                :error-message="message(phaseFieldKey(phase.id, 'current'))"
                 class="flex-grow-1"
                 style="min-width: 150px"
-                @update:model-value="
-                  updatePhase(phase.id, { current: Number($event) })
-                "
+                @commit="store.commitPhaseField(phase.id, 'current', $event)"
               />
               <v-btn-toggle
                 :model-value="phase.currentUnit"
@@ -239,18 +233,13 @@ function isHighlighted(id: string): boolean {
 
             <!-- Duration + Unit -->
             <div class="d-flex ga-2 flex-wrap align-center">
-              <v-text-field
+              <NumericField
                 :model-value="phase.duration"
                 :label="i18n.t('duration')"
-                type="number"
-                variant="outlined"
-                density="compact"
-                hide-details="auto"
+                :error-message="message(phaseFieldKey(phase.id, 'duration'))"
                 class="flex-grow-1"
                 style="min-width: 150px"
-                @update:model-value="
-                  updatePhase(phase.id, { duration: Number($event) })
-                "
+                @commit="store.commitPhaseField(phase.id, 'duration', $event)"
               />
               <v-btn-toggle
                 :model-value="phase.durationUnit"
@@ -274,18 +263,13 @@ function isHighlighted(id: string): boolean {
 
             <!-- Frequency + Unit -->
             <div class="d-flex ga-2 flex-wrap align-center">
-              <v-text-field
+              <NumericField
                 :model-value="phase.frequency"
                 :label="i18n.t('frequency')"
-                type="number"
-                variant="outlined"
-                density="compact"
-                hide-details="auto"
+                :error-message="message(phaseFieldKey(phase.id, 'frequency'))"
                 class="flex-grow-1"
                 style="min-width: 150px"
-                @update:model-value="
-                  updatePhase(phase.id, { frequency: Number($event) })
-                "
+                @commit="store.commitPhaseField(phase.id, 'frequency', $event)"
               />
               <v-btn-toggle
                 :model-value="phase.frequencyUnit"

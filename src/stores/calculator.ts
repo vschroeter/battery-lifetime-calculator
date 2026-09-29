@@ -1,11 +1,30 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { calculate } from '@/lib/calc'
+import {
+  batteryFieldKey,
+  batteryFieldRule,
+  evaluateProfile,
+  isLegal,
+  leakageFieldKey,
+  legalSnapshot,
+  phaseFieldKey,
+  rememberPhase,
+  type FieldIssue,
+} from '@/lib/fields'
 import type {
   BatteryConfig,
   Phase,
   CalculatorState,
   LeakageCurrent,
+  CalculationResult,
 } from '@/types/calculator'
+
+export interface Presentation {
+  issues: FieldIssue[]
+  withheld: boolean
+  result: CalculationResult | null
+}
 
 export const useCalculatorStore = defineStore('calculator', () => {
   // State
@@ -45,6 +64,7 @@ export const useCalculatorStore = defineStore('calculator', () => {
   const highlightedPhaseId = computed(() => hoveredPhaseId.value ?? pinnedPhaseId.value)
 
   const leakageCurrents = ref<LeakageCurrent[]>([])
+  const lastLegal = ref<Record<string, number>>({})
 
   // Getters
   const state = computed<CalculatorState>(() => ({
@@ -53,9 +73,46 @@ export const useCalculatorStore = defineStore('calculator', () => {
     leakageCurrents: leakageCurrents.value,
   }))
 
+  const presentation = computed<Presentation>(() => {
+    const evaluated = evaluateProfile(state.value, lastLegal.value)
+    if (evaluated.withheld || !evaluated.model) {
+      return { issues: evaluated.issues, withheld: true, result: null }
+    }
+    const result = calculate(
+      evaluated.model.battery,
+      evaluated.model.phases,
+      evaluated.model.leakageCurrents,
+    )
+    if (result.errors.length > 0) {
+      return { issues: evaluated.issues, withheld: true, result: null }
+    }
+    return { issues: evaluated.issues, withheld: false, result }
+  })
+
+  function issueRule(key: string) {
+    return presentation.value.issues.find((issue) => issue.key === key)?.rule ?? null
+  }
+
+  function resolvedNumber(key: string): number | null {
+    const issue = presentation.value.issues.find((item) => item.key === key)
+    if (!issue) {
+      return readDisplayedNumber(key)
+    }
+    const held = lastLegal.value[key]
+    return held === undefined ? null : held
+  }
+
   // Actions
   function updateBattery(config: Partial<BatteryConfig>) {
     battery.value = { ...battery.value, ...config }
+  }
+
+  function commitBatteryField(
+    field: 'capacity_mAh' | 'usablePercent' | 'selfDischargePercentPerMonth',
+    value: number,
+  ) {
+    battery.value = { ...battery.value, [field]: value }
+    rememberCommitted(batteryFieldKey(field), batteryFieldRule(field), value)
   }
 
   function addPhase(phase: Omit<Phase, 'id'>) {
@@ -64,6 +121,19 @@ export const useCalculatorStore = defineStore('calculator', () => {
       id: `phase-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     }
     phases.value.push(newPhase)
+    const snapshot = { ...lastLegal.value }
+    rememberPhase(snapshot, newPhase)
+    lastLegal.value = snapshot
+  }
+
+  function commitPhaseField(
+    id: string,
+    field: 'current' | 'duration' | 'frequency',
+    value: number,
+  ) {
+    updatePhase(id, { [field]: value })
+    const rule = field === 'current' ? 'nonNegative' : 'positive'
+    rememberCommitted(phaseFieldKey(id, field), rule, value)
   }
 
   function updatePhase(id: string, updates: Partial<Phase>) {
@@ -75,10 +145,15 @@ export const useCalculatorStore = defineStore('calculator', () => {
 
   function removePhase(id: string) {
     phases.value = phases.value.filter((p) => p.id !== id)
+    forgetKeysWithPrefix(`phase.${id}.`)
   }
 
   function removeAllPhases() {
+    const removed = phases.value.filter((phase) => !phase.isDeepSleep)
     phases.value = phases.value.filter((p) => p.isDeepSleep)
+    for (const phase of removed) {
+      forgetKeysWithPrefix(`phase.${phase.id}.`)
+    }
   }
 
   function resetToESP32Preset() {
@@ -114,6 +189,7 @@ export const useCalculatorStore = defineStore('calculator', () => {
     leakageCurrents.value = []
     hoveredPhaseId.value = null
     pinnedPhaseId.value = null
+    lastLegal.value = legalSnapshot(state.value)
   }
 
   function replaceState(nextState: CalculatorState) {
@@ -123,6 +199,7 @@ export const useCalculatorStore = defineStore('calculator', () => {
     leakageCurrents.value = nextState.leakageCurrents.map((leakage) => ({ ...leakage }))
     hoveredPhaseId.value = null
     pinnedPhaseId.value = null
+    lastLegal.value = legalSnapshot(state.value)
   }
 
   function setHoveredPhase(id: string | null) {
@@ -139,6 +216,17 @@ export const useCalculatorStore = defineStore('calculator', () => {
       id: `leakage-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     }
     leakageCurrents.value.push(newLeakage)
+    if (isLegal('nonNegative', newLeakage.current)) {
+      lastLegal.value = {
+        ...lastLegal.value,
+        [leakageFieldKey(newLeakage.id)]: newLeakage.current,
+      }
+    }
+  }
+
+  function commitLeakageCurrent(id: string, value: number) {
+    updateLeakageCurrent(id, { current: value })
+    rememberCommitted(leakageFieldKey(id), 'nonNegative', value)
   }
 
   function updateLeakageCurrent(id: string, updates: Partial<LeakageCurrent>) {
@@ -150,11 +238,55 @@ export const useCalculatorStore = defineStore('calculator', () => {
 
   function removeLeakageCurrent(id: string) {
     leakageCurrents.value = leakageCurrents.value.filter((l) => l.id !== id)
+    forgetKeysWithPrefix(leakageFieldKey(id))
   }
 
   function removeAllLeakageCurrents() {
     leakageCurrents.value = []
+    const next = { ...lastLegal.value }
+    for (const key of Object.keys(next)) {
+      if (key.startsWith('leakage.')) {
+        delete next[key]
+      }
+    }
+    lastLegal.value = next
   }
+
+  function rememberCommitted(key: string, rule: FieldIssue['rule'], value: number) {
+    if (!isLegal(rule, value)) {
+      return
+    }
+    lastLegal.value = { ...lastLegal.value, [key]: value }
+  }
+
+  function forgetKeysWithPrefix(prefix: string) {
+    const next = { ...lastLegal.value }
+    for (const key of Object.keys(next)) {
+      if (key.startsWith(prefix)) {
+        delete next[key]
+      }
+    }
+    lastLegal.value = next
+  }
+
+  function readDisplayedNumber(key: string): number | null {
+    if (key === batteryFieldKey('capacity_mAh')) return battery.value.capacity_mAh
+    if (key === batteryFieldKey('usablePercent')) return battery.value.usablePercent
+    if (key === batteryFieldKey('selfDischargePercentPerMonth')) {
+      return battery.value.selfDischargePercentPerMonth
+    }
+    for (const phase of phases.value) {
+      if (key === phaseFieldKey(phase.id, 'current')) return phase.current
+      if (key === phaseFieldKey(phase.id, 'duration')) return phase.duration
+      if (key === phaseFieldKey(phase.id, 'frequency')) return phase.frequency
+    }
+    for (const leakage of leakageCurrents.value) {
+      if (key === leakageFieldKey(leakage.id)) return leakage.current
+    }
+    return null
+  }
+
+  lastLegal.value = legalSnapshot(state.value)
 
   return {
     battery,
@@ -164,9 +296,14 @@ export const useCalculatorStore = defineStore('calculator', () => {
     highlightedPhaseId,
     leakageCurrents,
     state,
+    presentation,
+    issueRule,
+    resolvedNumber,
     updateBattery,
+    commitBatteryField,
     addPhase,
     updatePhase,
+    commitPhaseField,
     removePhase,
     removeAllPhases,
     resetToESP32Preset,
@@ -175,6 +312,7 @@ export const useCalculatorStore = defineStore('calculator', () => {
     togglePinnedPhase,
     addLeakageCurrent,
     updateLeakageCurrent,
+    commitLeakageCurrent,
     removeLeakageCurrent,
     removeAllLeakageCurrents,
   }

@@ -1,49 +1,67 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useCalculatorStore } from '@/stores/calculator'
 import { useLocale } from '@/composables/useLocale'
+import { useFieldMessage } from '@/composables/useFieldMessage'
+import { batteryFieldKey } from '@/lib/fields'
+import NumericField from '@/components/NumericField.vue'
 
 const store = useCalculatorStore()
 const { i18n } = useLocale()
+const { message } = useFieldMessage()
 
-const capacity = computed({
-  get: () => store.battery.capacity_mAh,
-  set: (value) => store.updateBattery({ capacity_mAh: value }),
-})
-
-const usablePercent = computed({
-  get: () => store.battery.usablePercent,
-  set: (value) => store.updateBattery({ usablePercent: value }),
-})
+const usableFocused = ref(false)
+const selfDischargeFocused = ref(false)
 
 const usableCapacity_mAh = computed(() => {
   return store.battery.capacity_mAh * (store.battery.usablePercent / 100)
 })
 
-const selfDischargePercentPerMonth = computed({
-  get: () => store.battery.selfDischargePercentPerMonth,
-  set: (value) => store.updateBattery({ selfDischargePercentPerMonth: value }),
+const usableSlider = computed(() => {
+  const resolved = store.resolvedNumber(batteryFieldKey('usablePercent'))
+  if (resolved !== null) {
+    return resolved
+  }
+  return Math.min(100, Math.max(1, store.battery.usablePercent))
 })
+
+const selfDischargeSlider = computed(() => {
+  const resolved = store.resolvedNumber(batteryFieldKey('selfDischargePercentPerMonth'))
+  if (resolved !== null) {
+    return resolved
+  }
+  return Math.min(99.99, Math.max(0, store.battery.selfDischargePercentPerMonth))
+})
+
+function onUsableSlider(value: number) {
+  if (usableFocused.value) {
+    return
+  }
+  store.commitBatteryField('usablePercent', value)
+}
+
+function onSelfDischargeSlider(value: number) {
+  if (selfDischargeFocused.value) {
+    return
+  }
+  store.commitBatteryField('selfDischargePercentPerMonth', value)
+}
 </script>
 
 <template>
   <v-form class="d-flex flex-column ga-3">
-    <v-text-field
-      v-model.number="capacity"
+    <NumericField
+      :model-value="store.battery.capacity_mAh"
       :label="i18n.t('capacity')"
+      :error-message="message(batteryFieldKey('capacity_mAh'))"
       suffix="mAh"
-      type="number"
-      min="0"
-      step="1"
-      variant="outlined"
-      density="compact"
-      hide-details="auto"
+      @commit="store.commitBatteryField('capacity_mAh', $event)"
     />
 
     <v-row align="center" class="ga-3">
       <v-col cols="12" md class="d-flex align-center">
         <v-slider
-          v-model="usablePercent"
+          :model-value="usableSlider"
           :label="i18n.t('usableCapacity')"
           min="1"
           max="100"
@@ -54,20 +72,17 @@ const selfDischargePercentPerMonth = computed({
           hide-details
           class="flex-grow-1"
           style="min-width: 200px"
+          @update:model-value="onUsableSlider(Number($event))"
         />
       </v-col>
       <v-col cols="12" md="auto" class="d-flex align-center">
-        <v-text-field
-          v-model.number="usablePercent"
-          type="number"
+        <NumericField
+          @update:focused="usableFocused = $event"
+          :model-value="store.battery.usablePercent"
+          :error-message="message(batteryFieldKey('usablePercent'))"
           class="numeric-input"
-          density="compact"
-          variant="outlined"
-          hide-details
-          min="1"
-          max="100"
-          step="1"
           suffix="%"
+          @commit="store.commitBatteryField('usablePercent', $event)"
         />
       </v-col>
     </v-row>
@@ -78,7 +93,7 @@ const selfDischargePercentPerMonth = computed({
     <v-row align="center" class="ga-3">
       <v-col cols="12" md class="d-flex align-center">
         <v-slider
-          v-model="selfDischargePercentPerMonth"
+          :model-value="selfDischargeSlider"
           :label="i18n.t('selfDischarge')"
           min="0"
           max="99.99"
@@ -89,20 +104,17 @@ const selfDischargePercentPerMonth = computed({
           hide-details
           class="flex-grow-1"
           style="min-width: 200px"
+          @update:model-value="onSelfDischargeSlider(Number($event))"
         />
       </v-col>
       <v-col cols="12" md="auto" class="d-flex align-center">
-        <v-text-field
-          v-model.number="selfDischargePercentPerMonth"
-          type="number"
+        <NumericField
+          @update:focused="selfDischargeFocused = $event"
+          :model-value="store.battery.selfDischargePercentPerMonth"
+          :error-message="message(batteryFieldKey('selfDischargePercentPerMonth'))"
           class="numeric-input"
-          density="compact"
-          variant="outlined"
-          hide-details
-          min="0"
-          max="99.99"
-          step="0.1"
           suffix="%/month"
+          @commit="store.commitBatteryField('selfDischargePercentPerMonth', $event)"
         />
       </v-col>
     </v-row>
@@ -122,4 +134,3 @@ const selfDischargePercentPerMonth = computed({
   text-align: right;
 }
 </style>
-
