@@ -1,160 +1,24 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useCalculatorStore } from '@/stores/calculator'
 import { useLocale } from '@/composables/useLocale'
 import { calculate } from '@/lib/calc'
-import { exportConfigAsJSON, exportResultsAsCSV } from '@/lib/export'
-import { importConfigFromJSON, type ImportNotice } from '@/lib/import'
 import PhaseShareDonut from '@/components/Charts/PhaseShareDonut.vue'
 
 const store = useCalculatorStore()
 const { i18n } = useLocale()
-const shouldCalculate = ref(false)
-const fileInput = ref<HTMLInputElement | null>(null)
-const importMessage = ref('')
-const importStatus = ref<'success' | 'warning' | 'error'>('success')
-const isImportAlertVisible = ref(false)
 
-const calculationResult = computed(() => {
-  if (!shouldCalculate.value) {
-    return null
-  }
-  return calculate(store.battery, store.phases, store.leakageCurrents)
-})
-
-function triggerCalculation() {
-  shouldCalculate.value = true
-}
-
-// Auto-calculate on changes (live update)
-const autoCalculation = computed(() => {
-  return calculate(store.battery, store.phases, store.leakageCurrents)
-})
-
-const displayResult = computed(() => {
-  return shouldCalculate.value ? calculationResult.value : autoCalculation.value
-})
-
-function openImportDialog() {
-  fileInput.value?.click()
-}
-
-function showImportStatus(type: 'success' | 'warning' | 'error', detailKey: string, detail?: string) {
-  importStatus.value = type
-  importMessage.value = detail ? `${i18n.t(detailKey)} ${detail}` : i18n.t(detailKey)
-  isImportAlertVisible.value = true
-}
-
-function formatImportNotices(notices: ImportNotice[]): string {
-  return notices
-    .map((notice) => {
-      if (notice.code === 'addedDefaultDeepSleep') {
-        return i18n.t('importAddedDeepSleep')
-      }
-
-      const key = notice.count === 1 ? 'importDroppedDeepSleepOne' : 'importDroppedDeepSleepMany'
-      return i18n.t(key).replace('{count}', String(notice.count))
-    })
-    .join(' ')
-}
-
-async function handleImportChange(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-
-  // Ignore canceled file selections.
-  if (!file) {
-    return
-  }
-
-  try {
-    // Load the exported JSON back into the calculator state.
-    const jsonText = await file.text()
-    const imported = importConfigFromJSON(jsonText)
-    store.replaceState(imported.state)
-    shouldCalculate.value = true
-    const notices = formatImportNotices(imported.notices)
-    showImportStatus(notices ? 'warning' : 'success', 'importSuccess', notices || undefined)
-  } catch (error) {
-    const message = error instanceof Error ? error.message : i18n.t('importError')
-    showImportStatus('error', 'importError', message)
-  } finally {
-    input.value = ''
-  }
-}
+const displayResult = computed(() =>
+  calculate(store.battery, store.phases, store.leakageCurrents),
+)
 </script>
 
 <template>
   <v-card class="modern-card results-card" elevation="1">
-    <v-card-title class="d-flex justify-space-between align-center flex-wrap ga-2 pa-4 pb-2 results-card-header">
-      <span class="text-h6">{{ i18n.t('results') }}</span>
-      <div class="d-flex ga-2">
-        <input
-          ref="fileInput"
-          type="file"
-          accept=".json,application/json"
-          class="d-none"
-          @change="handleImportChange"
-        >
-        <v-btn
-          v-if="false"
-          color="primary"
-          prepend-icon="mdi-calculator"
-          density="compact"
-          @click="triggerCalculation"
-        >
-          {{ i18n.t('calculate') }}
-        </v-btn>
-        <v-btn
-          color="secondary"
-          prepend-icon="mdi-upload"
-          variant="outlined"
-          density="compact"
-          @click="openImportDialog"
-        >
-          {{ i18n.t('import') }}
-        </v-btn>
-        <v-menu>
-          <template #activator="{ props: menuProps }">
-            <v-btn
-              color="secondary"
-              prepend-icon="mdi-download"
-              variant="outlined"
-              density="compact"
-              v-bind="menuProps"
-            >
-              {{ i18n.t('export') }}
-            </v-btn>
-          </template>
-          <v-list>
-            <v-list-item
-              prepend-icon="mdi-code-json"
-              :title="i18n.t('exportConfigJSON')"
-              @click="exportConfigAsJSON(store.state)"
-            />
-            <v-list-item
-              v-if="displayResult && displayResult.errors.length === 0"
-              prepend-icon="mdi-file-excel"
-              :title="i18n.t('exportResultsCSV')"
-              @click="displayResult && exportResultsAsCSV(displayResult)"
-            />
-          </v-list>
-        </v-menu>
-      </div>
+    <v-card-title class="text-h6 pa-4 pb-2 results-card-header">
+      {{ i18n.t('results') }}
     </v-card-title>
     <v-card-text class="pa-4 pt-2 results-card-content">
-      <v-alert
-        v-if="isImportAlertVisible"
-        :type="importStatus"
-        variant="tonal"
-        density="compact"
-        closable
-        class="mb-4"
-        @click:close="isImportAlertVisible = false"
-      >
-        {{ importMessage }}
-      </v-alert>
-
       <div v-if="displayResult">
         <!-- Errors -->
         <v-alert

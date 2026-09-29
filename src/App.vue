@@ -3,6 +3,7 @@ import { ref, provide, computed } from 'vue'
 import { useDisplay } from 'vuetify'
 import type { Locale } from '@/i18n/messages'
 import BatteryForm from '@/components/BatteryForm.vue'
+import ConfigActions from '@/components/ConfigActions.vue'
 import PhasesEditor from '@/components/PhasesEditor.vue'
 import ResultsPanel from '@/components/ResultsPanel.vue'
 import { useI18nLite } from '@/composables/useI18n'
@@ -34,13 +35,14 @@ provide('i18n', i18n)
         src="/icons/BatteryIcon.svg"
         max-width="40"
         max-height="40"
-        class="mr-3"
+        class="mr-3 flex-shrink-0"
         alt="Battery Icon"
       />
-      <v-spacer />
-      <v-app-bar-title class="text-center">{{ i18n.t('appTitle') }}</v-app-bar-title>
-      <v-spacer />
+      <v-spacer v-if="!display.mdAndDown.value" />
+      <v-app-bar-title class="app-title">{{ i18n.t('appTitle') }}</v-app-bar-title>
+      <v-spacer v-if="!display.mdAndDown.value" />
       <v-btn
+        class="header-trailing flex-shrink-0"
         icon="mdi-github"
         variant="text"
         href="https://github.com/vschroeter/battery-lifetime-calculator"
@@ -48,12 +50,14 @@ provide('i18n', i18n)
         rel="noopener noreferrer"
       />
       <v-btn
+        class="header-trailing flex-shrink-0"
         prepend-icon="mdi-translate"
         variant="text"
         @click="locale = locale === 'de' ? 'en' : 'de'"
       >
         {{ locale === 'de' ? 'EN' : 'DE' }}
       </v-btn>
+      <ConfigActions />
     </v-app-bar>
 
     <v-main class="main-content">
@@ -175,10 +179,32 @@ provide('i18n', i18n)
 </template>
 
 <style scoped>
-:deep(.v-app-bar-title) {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
+.app-title {
+  min-width: 0;
+}
+
+@media (max-width: 1279.98px) {
+  .app-title {
+    flex: 1 1 auto;
+  }
+
+  .app-title :deep(.v-toolbar-title__placeholder) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+@media (min-width: 1280px) {
+  .app-title {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .header-trailing {
+    order: 1;
+  }
 }
 
 .modern-card {
