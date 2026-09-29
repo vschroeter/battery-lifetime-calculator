@@ -12,6 +12,7 @@ import {
   rememberPhase,
   type FieldIssue,
 } from '@/lib/fields'
+import { createExampleProfile } from '@/lib/exampleProfile'
 import type {
   BatteryConfig,
   Phase,
@@ -27,37 +28,12 @@ export interface Presentation {
 }
 
 export const useCalculatorStore = defineStore('calculator', () => {
-  // State
-  const battery = ref<BatteryConfig>({
-    capacity_mAh: 1000,
-    usablePercent: 80,
-    selfDischargePercentPerMonth: 0,
-  })
+  const example = createExampleProfile()
 
-  const phases = ref<Phase[]>([
-    {
-      id: 'active-1',
-      name: 'Active',
-      isDeepSleep: false,
-      current: 80,
-      currentUnit: 'mA',
-      duration: 0.2,
-      durationUnit: 's',
-      frequency: 1,
-      frequencyUnit: 'perHour',
-    },
-    {
-      id: 'deepsleep-1',
-      name: 'DeepSleep',
-      isDeepSleep: true,
-      current: 0.01,
-      currentUnit: 'mA',
-      duration: 0,
-      durationUnit: 's',
-      frequency: 0,
-      frequencyUnit: 'perHour',
-    },
-  ])
+  // State
+  const battery = ref<BatteryConfig>(example.battery)
+
+  const phases = ref<Phase[]>(example.phases)
 
   const hoveredPhaseId = ref<string | null>(null)
   const pinnedPhaseId = ref<string | null>(null)
@@ -157,36 +133,10 @@ export const useCalculatorStore = defineStore('calculator', () => {
   }
 
   function resetToESP32Preset() {
-    battery.value = {
-      capacity_mAh: 1000,
-      usablePercent: 80,
-      selfDischargePercentPerMonth: 0,
-    }
-    phases.value = [
-      {
-        id: 'active-1',
-        name: 'Active',
-        isDeepSleep: false,
-        current: 80,
-        currentUnit: 'mA',
-        duration: 0.2,
-        durationUnit: 's',
-        frequency: 1,
-        frequencyUnit: 'perHour',
-      },
-      {
-        id: 'deepsleep-1',
-        name: 'DeepSleep',
-        isDeepSleep: true,
-        current: 0.01,
-        currentUnit: 'mA',
-        duration: 0,
-        durationUnit: 's',
-        frequency: 0,
-        frequencyUnit: 'perHour',
-      },
-    ]
-    leakageCurrents.value = []
+    const next = createExampleProfile()
+    battery.value = next.battery
+    phases.value = next.phases
+    leakageCurrents.value = next.leakageCurrents
     hoveredPhaseId.value = null
     pinnedPhaseId.value = null
     lastLegal.value = legalSnapshot(state.value)

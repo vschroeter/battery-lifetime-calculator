@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useDisplay } from 'vuetify'
 import { useCalculatorStore } from '@/stores/calculator'
 import { useLocale } from '@/composables/useLocale'
+import { useProfileUrl } from '@/composables/useProfileUrl'
 import { exportConfigAsJSON, exportResultsAsCSV, type CsvLabels } from '@/lib/export'
 import { ConfigImportError, importConfigFromJSON, type ImportNotice, type ImportResult } from '@/lib/import'
 import ConfigActionsMenu from '@/components/ConfigActionsMenu.vue'
@@ -10,12 +11,17 @@ import ConfigActionsMenu from '@/components/ConfigActionsMenu.vue'
 const store = useCalculatorStore()
 const { i18n } = useLocale()
 const display = useDisplay()
+const { feedback, hashPresent, copyProfileLink, resetToExample, publishImportedProfile } = useProfileUrl()
 
 const fileInput = ref<HTMLInputElement | null>(null)
+const copyField = ref<HTMLInputElement | null>(null)
 const importMessage = ref('')
 const importStatus = ref<'success' | 'warning' | 'error'>('success')
 const isImportAlertVisible = ref(false)
 const isReplaceDialogVisible = ref(false)
+const isResetDialogVisible = ref(false)
+const isCopyDialogVisible = ref(false)
+const manualCopyUrl = ref('')
 const pendingImport = ref<ImportResult | null>(null)
 
 const displayResult = computed(() => store.presentation.result)
@@ -129,6 +135,9 @@ function confirmImport() {
   }
 
   store.replaceState(imported.state)
+  if (!publishImportedProfile()) {
+    return
+  }
   const notices = formatImportNotices(imported.notices)
   const summary = notices
     ? `${i18n.t('importSuccess')} ${notices}`
@@ -140,6 +149,57 @@ function cancelImport() {
   pendingImport.value = null
   isReplaceDialogVisible.value = false
 }
+
+function confirmReset() {
+  isResetDialogVisible.value = false
+  resetToExample()
+}
+
+function cancelReset() {
+  isResetDialogVisible.value = false
+}
+
+watch(isCopyDialogVisible, async (open) => {
+  if (!open) {
+    return
+  }
+  await nextTick()
+  copyField.value?.focus()
+  copyField.value?.select()
+})
+
+watch(
+  feedback,
+  (notice) => {
+    if (!notice) {
+      return
+    }
+    feedback.value = null
+    if (notice.kind === 'copied') {
+      showImportStatus('success', i18n.t('copyLinkSuccess'))
+      return
+    }
+    if (notice.kind === 'manual-copy') {
+      manualCopyUrl.value = notice.url
+      isCopyDialogVisible.value = true
+      return
+    }
+    if (notice.kind === 'encode-failed') {
+      showImportStatus('error', i18n.t('profileEncodeFailed'))
+      return
+    }
+    if (notice.kind === 'normalized') {
+      showImportStatus('warning', i18n.t('profileUrlNormalized'))
+      return
+    }
+    if (notice.kind === 'notices') {
+      showImportStatus('warning', formatImportNotices(notice.notices))
+      return
+    }
+    showImportStatus('error', i18n.t('profileUrlInvalid'))
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -158,31 +218,22 @@ function cancelImport() {
           class="config-overflow"
           icon="mdi-dots-vertical"
           variant="text"
-          :aria-label="i18n.t('importExport')"
+          :aria-label="i18n.t('configuration')"
           v-bind="menuProps"
         />
       </template>
       <ConfigActionsMenu
-        compact
         :can-export-results="canExportResults"
+        :can-reset="hashPresent"
+        @copy-link="copyProfileLink"
         @import="openImportDialog"
         @export-config="exportConfig"
         @export-results="exportResults"
+        @reset="isResetDialogVisible = true"
       />
     </v-menu>
 
-    <div v-else class="config-actions" role="group" :aria-label="i18n.t('importExport')">
-      <v-btn
-        class="config-action"
-        variant="text"
-        size="small"
-        rounded="pill"
-        prepend-icon="mdi-import"
-        @click="openImportDialog"
-      >
-        {{ i18n.t('import') }}
-      </v-btn>
-      <div class="config-actions-divider" aria-hidden="true" />
+    <div v-else class="config-actions" role="group" :aria-label="i18n.t('configuration')">
       <v-menu location="bottom end" offset="26">
         <template #activator="{ props: menuProps }">
           <v-btn
@@ -190,17 +241,21 @@ function cancelImport() {
             variant="text"
             size="small"
             rounded="pill"
-            prepend-icon="mdi-export"
+            prepend-icon="mdi-cog-outline"
             append-icon="mdi-chevron-down"
             v-bind="menuProps"
           >
-            {{ i18n.t('export') }}
+            {{ i18n.t('configuration') }}
           </v-btn>
         </template>
         <ConfigActionsMenu
           :can-export-results="canExportResults"
+          :can-reset="hashPresent"
+          @copy-link="copyProfileLink"
+          @import="openImportDialog"
           @export-config="exportConfig"
           @export-results="exportResults"
+          @reset="isResetDialogVisible = true"
         />
       </v-menu>
     </div>
@@ -224,6 +279,57 @@ function cancelImport() {
           </v-btn>
           <v-btn color="primary" variant="flat" @click="confirmImport">
             {{ i18n.t('importReplaceConfirm') }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog
+      :model-value="isResetDialogVisible"
+      max-width="440"
+      @update:model-value="(open: boolean) => { if (!open) cancelReset() }"
+    >
+      <v-card>
+        <v-card-title class="text-h6 pa-4 pb-2">
+          {{ i18n.t('resetExampleTitle') }}
+        </v-card-title>
+        <v-card-text class="pa-4 pt-2">
+          {{ i18n.t('resetExampleBody') }}
+        </v-card-text>
+        <v-card-actions class="px-4 pb-4">
+          <v-spacer />
+          <v-btn variant="text" @click="cancelReset">
+            {{ i18n.t('cancel') }}
+          </v-btn>
+          <v-btn color="primary" variant="flat" @click="confirmReset">
+            {{ i18n.t('resetExampleConfirm') }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <v-dialog
+      v-model="isCopyDialogVisible"
+      max-width="560"
+    >
+      <v-card>
+        <v-card-title class="text-h6 pa-4 pb-2">
+          {{ i18n.t('copyLinkManualTitle') }}
+        </v-card-title>
+        <v-card-text class="pa-4 pt-2">
+          <p class="mb-3">{{ i18n.t('copyLinkManualBody') }}</p>
+          <input
+            ref="copyField"
+            class="copy-url-field"
+            type="text"
+            readonly
+            :value="manualCopyUrl"
+          >
+        </v-card-text>
+        <v-card-actions class="px-4 pb-4">
+          <v-spacer />
+          <v-btn color="primary" variant="flat" @click="isCopyDialogVisible = false">
+            {{ i18n.t('close') }}
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -267,13 +373,6 @@ function cancelImport() {
   border: 1px solid rgba(255, 255, 255, 0.22);
 }
 
-.config-actions-divider {
-  width: 1px;
-  align-self: stretch;
-  margin: 6px 2px;
-  background: rgba(255, 255, 255, 0.28);
-}
-
 .config-action {
   color: #fff !important;
   font-weight: 500;
@@ -292,5 +391,14 @@ function cancelImport() {
 .config-action :deep(.v-btn__append .v-icon) {
   font-size: 18px;
   opacity: 0.8;
+}
+
+.copy-url-field {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 4px;
+  font: inherit;
 }
 </style>
