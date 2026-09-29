@@ -13,6 +13,7 @@ import {
   type FieldIssue,
 } from '@/lib/fields'
 import { createExampleProfile } from '@/lib/exampleProfile'
+import { duplicatePhaseName, insertAfterPhase, placeActivePhase } from '@/lib/phaseList'
 import type {
   BatteryConfig,
   Phase,
@@ -91,15 +92,48 @@ export const useCalculatorStore = defineStore('calculator', () => {
     rememberCommitted(batteryFieldKey(field), batteryFieldRule(field), value)
   }
 
-  function addPhase(phase: Omit<Phase, 'id'>) {
+  function addPhase(phase: Omit<Phase, 'id'>): string {
     const newPhase: Phase = {
       ...phase,
-      id: `phase-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: createPhaseId(),
     }
     phases.value.push(newPhase)
     const snapshot = { ...lastLegal.value }
     rememberPhase(snapshot, newPhase)
     lastLegal.value = snapshot
+    return newPhase.id
+  }
+
+  function duplicatePhase(id: string): string | null {
+    const source = phases.value.find((phase) => phase.id === id)
+    if (!source || source.isDeepSleep) {
+      return null
+    }
+    const created: Phase = {
+      ...source,
+      id: createPhaseId(),
+      isDeepSleep: false,
+      name: duplicatePhaseName(source.name, new Set(phases.value.map((phase) => phase.name))),
+    }
+    phases.value = insertAfterPhase(phases.value, id, created)
+    const snapshot = { ...lastLegal.value }
+    for (const field of ['current', 'duration', 'frequency'] as const) {
+      const previous = snapshot[phaseFieldKey(source.id, field)]
+      if (previous !== undefined) {
+        snapshot[phaseFieldKey(created.id, field)] = previous
+      }
+    }
+    rememberPhase(snapshot, created)
+    lastLegal.value = snapshot
+    return created.id
+  }
+
+  function moveActivePhase(id: string, targetIndex: number) {
+    const next = placeActivePhase(phases.value, id, targetIndex)
+    if (next.every((phase, index) => phase.id === phases.value[index]?.id)) {
+      return
+    }
+    phases.value = next
   }
 
   function commitPhaseField(
@@ -202,6 +236,10 @@ export const useCalculatorStore = defineStore('calculator', () => {
     lastLegal.value = next
   }
 
+  function createPhaseId(): string {
+    return `phase-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
+  }
+
   function rememberCommitted(key: string, rule: FieldIssue['rule'], value: number) {
     if (!isLegal(rule, value)) {
       return
@@ -252,6 +290,8 @@ export const useCalculatorStore = defineStore('calculator', () => {
     updateBattery,
     commitBatteryField,
     addPhase,
+    duplicatePhase,
+    moveActivePhase,
     updatePhase,
     commitPhaseField,
     removePhase,

@@ -19,9 +19,11 @@ const hasNonDeepSleepPhases = computed(() =>
 )
 
 const activeTab = ref('inputs')
+const isRemoveAllDialogVisible = ref(false)
 
-function removeAllPhases() {
+function confirmRemoveAllPhases() {
   store.removeAllPhases()
+  isRemoveAllDialogVisible.value = false
 }
 
 provide('locale', locale)
@@ -100,7 +102,7 @@ provide('i18n', i18n)
                             density="compact"
                             :disabled="!hasNonDeepSleepPhases"
                             v-bind="tooltipProps"
-                            @click="removeAllPhases"
+                            @click="isRemoveAllDialogVisible = true"
                           />
                         </template>
                         <span>{{ i18n.t('removeAllPhases') }}</span>
@@ -153,7 +155,7 @@ provide('i18n', i18n)
                           density="compact"
                           :disabled="!hasNonDeepSleepPhases"
                           v-bind="tooltipProps"
-                          @click="removeAllPhases"
+                          @click="isRemoveAllDialogVisible = true"
                         />
                       </template>
                       <span>{{ i18n.t('removeAllPhases') }}</span>
@@ -175,6 +177,26 @@ provide('i18n', i18n)
         </v-container>
       </template>
     </v-main>
+
+    <v-dialog v-model="isRemoveAllDialogVisible" max-width="440">
+      <v-card>
+        <v-card-title class="text-h6 pa-4 pb-2">
+          {{ i18n.t('removeAllPhasesTitle') }}
+        </v-card-title>
+        <v-card-text class="pa-4 pt-2">
+          {{ i18n.t('removeAllPhasesBody') }}
+        </v-card-text>
+        <v-card-actions class="px-4 pb-4">
+          <v-spacer />
+          <v-btn variant="text" @click="isRemoveAllDialogVisible = false">
+            {{ i18n.t('cancel') }}
+          </v-btn>
+          <v-btn color="error" variant="flat" @click="confirmRemoveAllPhases">
+            {{ i18n.t('removeAllPhases') }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-app>
 </template>
 
