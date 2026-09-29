@@ -28,12 +28,32 @@ function eventsLabel(events: number): string {
   return events > 0 ? formatCount(events) : i18n.t('notAvailable')
 }
 
-function activeTimeLabel(seconds: number): string {
-  if (!(seconds > 0)) {
-    return i18n.t('auto')
+function activeTimeLabel(result: { phaseId: string; activeTimePerDaySeconds: number }): string {
+  if (result.activeTimePerDaySeconds > 0) {
+    return formatQuantity(formatActiveTime(result.activeTimePerDaySeconds))
   }
-  return formatQuantity(formatActiveTime(seconds))
+  const phase = store.phases.find((item) => item.id === result.phaseId)
+  if (phase?.isDeepSleep) {
+    return formatQuantity(formatActiveTime(0))
+  }
+  return i18n.t('auto')
 }
+
+function formatBudgetSeconds(seconds: number): string {
+  const rounded = Math.round(seconds * 1000) / 1000
+  if (Number.isInteger(rounded)) {
+    return rounded.toFixed(0)
+  }
+  return rounded.toFixed(3).replace(/0+$/, '').replace(/\.$/, '')
+}
+
+const dayBudgetMessage = computed(() => {
+  const seconds = displayResult.value.activeTimePerDaySeconds
+  return i18n
+    .t('dayBudgetExceeded')
+    .replace('{hours}', (seconds / 3600).toFixed(2))
+    .replace('{seconds}', formatBudgetSeconds(seconds))
+})
 
 function isHighlighted(phaseId: string): boolean {
   return store.highlightedPhaseId === phaseId
@@ -62,6 +82,15 @@ function isHighlighted(phaseId: string): boolean {
           </ul>
         </v-alert>
 
+        <v-alert
+          v-if="displayResult.dayBudgetExceeded"
+          type="error"
+          variant="tonal"
+          class="mb-4"
+        >
+          {{ dayBudgetMessage }}
+        </v-alert>
+
         <!-- Warnings -->
         <v-alert
           v-if="displayResult.warnings.length > 0"
@@ -78,7 +107,7 @@ function isHighlighted(phaseId: string): boolean {
         </v-alert>
 
         <!-- KPIs -->
-        <div v-if="displayResult.errors.length === 0" class="d-flex flex-column ga-3">
+        <div v-if="displayResult.errors.length === 0 && !displayResult.dayBudgetExceeded" class="d-flex flex-column ga-3">
           <div class="d-flex ga-3 flex-wrap">
             <v-card class="result-tile modern-card flex-grow-1" elevation="1" style="min-width: 200px">
               <v-card-text class="pa-3">
@@ -120,12 +149,24 @@ function isHighlighted(phaseId: string): boolean {
             <PhaseShareDonut :phase-results="displayResult.phaseResults" />
             <!-- <SensitivityBar /> -->
           </div>
+        </div>
 
+        <div
+          v-if="displayResult.errors.length === 0"
+          class="d-flex flex-column ga-3"
+          :class="{ 'mt-3': !displayResult.dayBudgetExceeded }"
+        >
           <!-- Phase Breakdown -->
           <v-card class="modern-card" elevation="1">
             <v-card-title class="text-subtitle-1 pa-3 pb-2">
               {{ i18n.t('consumptionByPhase') }}
             </v-card-title>
+            <p
+              v-if="displayResult.dayBudgetExceeded"
+              class="text-body-2 text-medium-emphasis px-3 mb-0"
+            >
+              {{ i18n.t('dayBudgetCaption') }}
+            </p>
             <v-card-text class="pa-3 pt-2">
               <v-table density="compact" class="results-table">
                 <thead>
@@ -158,7 +199,7 @@ function isHighlighted(phaseId: string): boolean {
                       {{ eventsLabel(result.eventsPerDay) }}
                     </td>
                     <td class="text-end text-body-2">
-                      {{ activeTimeLabel(result.activeTimePerDaySeconds) }}
+                      {{ activeTimeLabel(result) }}
                     </td>
                   </tr>
                 </tbody>

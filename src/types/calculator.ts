@@ -51,5 +51,12 @@ export interface CalculationResult {
   runtimeYears: number
   errors: string[]
   warnings: string[]
+  /**
+   * True when the sum of active-phase daily averages exceeds 24 h by more than 1 ms.
+   * Phase rows stay; lifetime aggregates stay at 0. This is separate from `errors`.
+   */
+  dayBudgetExceeded: boolean
+  /** Sum of active-phase daily averages, in seconds. Deep sleep and leakage are not included. */
+  activeTimePerDaySeconds: number
 }
 

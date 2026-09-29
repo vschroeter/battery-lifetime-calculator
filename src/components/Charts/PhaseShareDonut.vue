@@ -17,13 +17,18 @@ const store = useCalculatorStore()
 
 const chartContainer = ref<SVGElement | null>(null)
 
+// A zero-charge slice, including a deep-sleep remainder of 0 mAh, is omitted.
+const shareResults = computed(() =>
+  props.phaseResults.filter((result) => result.mAhPerDay > 0),
+)
+
 const total = computed(() =>
-  props.phaseResults.reduce((sum, r) => sum + r.mAhPerDay, 0),
+  shareResults.value.reduce((sum, r) => sum + r.mAhPerDay, 0),
 )
 
 // Sort phases by share (mAhPerDay) descending
 const sortedPhaseResults = computed(() =>
-  [...props.phaseResults].sort((a, b) => b.mAhPerDay - a.mAhPerDay),
+  [...shareResults.value].sort((a, b) => b.mAhPerDay - a.mAhPerDay),
 )
 
 // Get all non-DeepSleep phases to determine color indices

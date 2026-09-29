@@ -171,7 +171,7 @@ export function exportResultsAsCSV(
   battery: BatteryConfig,
   labels: CsvLabels,
 ): void {
-  if (result.errors.length > 0) {
+  if (result.errors.length > 0 || result.dayBudgetExceeded) {
     return
   }
 

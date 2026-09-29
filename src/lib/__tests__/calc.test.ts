@@ -64,6 +64,17 @@ describe('calculate leakage and self-discharge', () => {
           frequency: 24,
           frequencyUnit: 'perDay',
         },
+        {
+          id: 'sleep',
+          name: 'DeepSleep',
+          isDeepSleep: true,
+          current: 0,
+          currentUnit: 'mA',
+          duration: 0,
+          durationUnit: 's',
+          frequency: 0,
+          frequencyUnit: 'perHour',
+        },
       ],
     )
 
@@ -71,5 +82,134 @@ describe('calculate leakage and self-discharge', () => {
     expect(selfDischarge).toBeDefined()
     expect(selfDischarge!.mAhPerDay).toBeGreaterThan(0)
     expect(selfDischarge!.mAhPerDay).toBeLessThan(0.001)
+  })
+})
+
+function phase(overrides: Partial<Phase> & Pick<Phase, 'id' | 'name'>): Phase {
+  return {
+    isDeepSleep: false,
+    current: 10,
+    currentUnit: 'mA',
+    duration: 1,
+    durationUnit: 'h',
+    frequency: 1,
+    frequencyUnit: 'perDay',
+    ...overrides,
+  }
+}
+
+const sleep = phase({
+  id: 'sleep',
+  name: 'DeepSleep',
+  isDeepSleep: true,
+  current: 0.01,
+  duration: 0,
+  frequency: 0,
+})
+
+describe('day budget', () => {
+  it('bills a 36 h event once a week as its daily average', () => {
+    const result = calculate(battery, [
+      phase({
+        id: 'long',
+        name: 'Long',
+        duration: 36,
+        durationUnit: 'h',
+        frequency: 1,
+        frequencyUnit: 'perWeek',
+      }),
+      sleep,
+    ])
+
+    expect(result.errors).toEqual([])
+    expect(result.dayBudgetExceeded).toBe(false)
+    expect(result.activeTimePerDaySeconds).toBeCloseTo((36 * 3600) / 7, 6)
+    expect(result.runtimeDays).toBeGreaterThan(0)
+    const deepSleep = result.phaseResults.find((row) => row.phaseId === 'sleep')
+    expect(deepSleep!.activeTimePerDaySeconds).toBeCloseTo(86400 - (36 * 3600) / 7, 3)
+  })
+
+  it('keeps a day that lands within 1 ms of 24 h and shows a zero remainder', () => {
+    const result = calculate(battery, [
+      phase({
+        id: 'full',
+        name: 'Full',
+        duration: 86400.001,
+        durationUnit: 's',
+        frequency: 1,
+        frequencyUnit: 'perDay',
+      }),
+      { ...sleep, current: 0 },
+    ])
+
+    expect(result.dayBudgetExceeded).toBe(false)
+    expect(result.runtimeDays).toBeGreaterThan(0)
+    const deepSleep = result.phaseResults.find((row) => row.phaseId === 'sleep')
+    expect(deepSleep).toMatchObject({ mAhPerDay: 0, activeTimePerDaySeconds: 0 })
+    expect(result.phaseResults.some((row) => row.phaseId === 'self-discharge-virtual')).toBe(false)
+  })
+
+  it('withholds the lifetime when two 13 h phases exceed the day, and still lists leakage', () => {
+    const result = calculate(
+      battery,
+      [
+        phase({ id: 'a', name: 'A', duration: 13, durationUnit: 'h' }),
+        phase({ id: 'b', name: 'B', duration: 13, durationUnit: 'h' }),
+        sleep,
+      ],
+      [{ id: 'leak', label: 'probe', current: 1, currentUnit: 'µA' }],
+    )
+
+    expect(result.errors).toEqual([])
+    expect(result.warnings).toEqual([])
+    expect(result.dayBudgetExceeded).toBe(true)
+    expect(result.activeTimePerDaySeconds).toBe(26 * 3600)
+    expect(result.runtimeDays).toBe(0)
+    expect(result.totalmAhPerDay).toBe(0)
+    expect(result.phaseResults.map((row) => row.phaseId)).toEqual(['a', 'b', 'leakage-currents-virtual'])
+    expect(result.phaseResults[0]!.mAhPerDay).toBeCloseTo(10 * 13, 6)
+    expect(result.phaseResults[1]!.mAhPerDay).toBeCloseTo(10 * 13, 6)
+  })
+
+  it('treats 2 ms over 24 h as an open day', () => {
+    const result = calculate(battery, [
+      phase({
+        id: 'over',
+        name: 'Over',
+        duration: 86400.002,
+        durationUnit: 's',
+      }),
+      sleep,
+    ])
+
+    expect(result.dayBudgetExceeded).toBe(true)
+    expect(result.runtimeDays).toBe(0)
+  })
+
+  it('returns no rows when the deep-sleep count is not one', () => {
+    const missing = calculate(battery, [phase({ id: 'a', name: 'A' })])
+    expect(missing.errors).toContain('Exactly one DeepSleep phase is required.')
+    expect(missing.phaseResults).toEqual([])
+    expect(missing.dayBudgetExceeded).toBe(false)
+
+    const extra = calculate(battery, [
+      phase({ id: 'a', name: 'A', duration: 13, durationUnit: 'h' }),
+      sleep,
+      { ...sleep, id: 'sleep-2' },
+    ])
+    expect(extra.phaseResults).toEqual([])
+    expect(extra.runtimeDays).toBe(0)
+  })
+
+  it('lets a field error hide an over-budget day', () => {
+    const result = calculate(battery, [
+      phase({ id: 'a', name: 'A', duration: 13, durationUnit: 'h', current: 0 }),
+      phase({ id: 'b', name: 'B', duration: 13, durationUnit: 'h' }),
+      sleep,
+    ])
+
+    expect(result.phaseResults).toEqual([])
+    expect(result.dayBudgetExceeded).toBe(false)
+    expect(result.errors.length).toBeGreaterThan(0)
   })
 })

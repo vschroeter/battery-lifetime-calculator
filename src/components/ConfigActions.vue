@@ -23,7 +23,9 @@ const displayResult = computed(() =>
   calculate(store.battery, store.phases, store.leakageCurrents),
 )
 
-const canExportResults = computed(() => displayResult.value.errors.length === 0)
+const canExportResults = computed(
+  () => displayResult.value.errors.length === 0 && !displayResult.value.dayBudgetExceeded,
+)
 
 function openImportDialog() {
   fileInput.value?.click()
