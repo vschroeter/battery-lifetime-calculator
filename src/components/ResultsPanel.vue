@@ -4,7 +4,7 @@ import { useCalculatorStore } from '@/stores/calculator'
 import { useLocale } from '@/composables/useLocale'
 import { calculate } from '@/lib/calc'
 import { exportConfigAsJSON, exportResultsAsCSV } from '@/lib/export'
-import { importConfigFromJSON } from '@/lib/import'
+import { importConfigFromJSON, type ImportNotice } from '@/lib/import'
 import PhaseShareDonut from '@/components/Charts/PhaseShareDonut.vue'
 
 const store = useCalculatorStore()
@@ -12,7 +12,7 @@ const { i18n } = useLocale()
 const shouldCalculate = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 const importMessage = ref('')
-const importStatus = ref<'success' | 'error'>('success')
+const importStatus = ref<'success' | 'warning' | 'error'>('success')
 const isImportAlertVisible = ref(false)
 
 const calculationResult = computed(() => {
@@ -39,10 +39,23 @@ function openImportDialog() {
   fileInput.value?.click()
 }
 
-function showImportStatus(type: 'success' | 'error', detailKey: string, detail?: string) {
+function showImportStatus(type: 'success' | 'warning' | 'error', detailKey: string, detail?: string) {
   importStatus.value = type
   importMessage.value = detail ? `${i18n.t(detailKey)} ${detail}` : i18n.t(detailKey)
   isImportAlertVisible.value = true
+}
+
+function formatImportNotices(notices: ImportNotice[]): string {
+  return notices
+    .map((notice) => {
+      if (notice.code === 'addedDefaultDeepSleep') {
+        return i18n.t('importAddedDeepSleep')
+      }
+
+      const key = notice.count === 1 ? 'importDroppedDeepSleepOne' : 'importDroppedDeepSleepMany'
+      return i18n.t(key).replace('{count}', String(notice.count))
+    })
+    .join(' ')
 }
 
 async function handleImportChange(event: Event) {
@@ -57,10 +70,11 @@ async function handleImportChange(event: Event) {
   try {
     // Load the exported JSON back into the calculator state.
     const jsonText = await file.text()
-    const nextState = importConfigFromJSON(jsonText)
-    store.replaceState(nextState)
+    const imported = importConfigFromJSON(jsonText)
+    store.replaceState(imported.state)
     shouldCalculate.value = true
-    showImportStatus('success', 'importSuccess')
+    const notices = formatImportNotices(imported.notices)
+    showImportStatus(notices ? 'warning' : 'success', 'importSuccess', notices || undefined)
   } catch (error) {
     const message = error instanceof Error ? error.message : i18n.t('importError')
     showImportStatus('error', 'importError', message)

@@ -8,6 +8,26 @@ import type {
   Phase,
 } from '@/types/calculator'
 
+export type ImportNotice =
+  | { code: 'droppedDeepSleep'; count: number }
+  | { code: 'addedDefaultDeepSleep' }
+
+export interface ImportResult {
+  state: CalculatorState
+  notices: ImportNotice[]
+}
+
+const DEFAULT_DEEP_SLEEP: Omit<Phase, 'id'> = {
+  name: 'DeepSleep',
+  isDeepSleep: true,
+  current: 0.01,
+  currentUnit: 'mA',
+  duration: 0,
+  durationUnit: 's',
+  frequency: 0,
+  frequencyUnit: 'perHour',
+}
+
 const CURRENT_UNITS = new Set<CurrentUnit>(['nA', 'µA', 'mA', 'A'])
 const DURATION_UNITS = new Set<DurationUnit>(['ms', 's', 'min', 'h'])
 const FREQUENCY_UNITS = new Set<FrequencyUnit>(['perHour', 'perDay', 'perWeek'])
@@ -122,7 +142,56 @@ function parseLeakageCurrent(value: unknown, index: number): LeakageCurrent {
   }
 }
 
-export function importConfigFromJSON(jsonText: string): CalculatorState {
+function nextId(prefix: 'phase' | 'leakage', used: Set<string>): string {
+  let id = ''
+  do {
+    id = `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
+  } while (used.has(id))
+  used.add(id)
+  return id
+}
+
+function withUniqueIds<T extends { id: string }>(
+  items: T[],
+  prefix: 'phase' | 'leakage',
+): T[] {
+  const used = new Set<string>()
+
+  return items.map((item) => {
+    const id = item.id.trim()
+    if (id !== '' && !used.has(id)) {
+      used.add(id)
+      return id === item.id ? item : { ...item, id }
+    }
+
+    return { ...item, id: nextId(prefix, used) }
+  })
+}
+
+function keepFirstDeepSleep(phases: Phase[]): { phases: Phase[]; dropped: number } {
+  let keptDeepSleep = false
+  let dropped = 0
+  const kept: Phase[] = []
+
+  for (const phase of phases) {
+    if (!phase.isDeepSleep) {
+      kept.push(phase)
+      continue
+    }
+
+    if (!keptDeepSleep) {
+      keptDeepSleep = true
+      kept.push(phase)
+      continue
+    }
+
+    dropped += 1
+  }
+
+  return { phases: kept, dropped }
+}
+
+export function importConfigFromJSON(jsonText: string): ImportResult {
   let parsed: unknown
 
   // Parse the exported config file before validating its shape.
@@ -142,19 +211,31 @@ export function importConfigFromJSON(jsonText: string): CalculatorState {
     throw new Error('The selected file does not match the exported configuration format.')
   }
 
+  const notices: ImportNotice[] = []
+  const parsedPhases = phases.map((phase, index) => parsePhase(phase, index))
+  const { phases: withOneDeepSleep, dropped } = keepFirstDeepSleep(parsedPhases)
+
+  if (dropped > 0) {
+    notices.push({ code: 'droppedDeepSleep', count: dropped })
+  }
+
+  if (!withOneDeepSleep.some((phase) => phase.isDeepSleep)) {
+    withOneDeepSleep.push({ ...DEFAULT_DEEP_SLEEP, id: '' })
+    notices.push({ code: 'addedDefaultDeepSleep' })
+  }
+
   // Rebuild a fully typed calculator state from the exported JSON structure.
   const nextState: CalculatorState = {
     battery: parseBatteryConfig(battery),
-    phases: phases.map((phase, index) => parsePhase(phase, index)),
-    leakageCurrents: leakageCurrents.map((leakage, index) =>
-      parseLeakageCurrent(leakage, index),
+    phases: withUniqueIds(withOneDeepSleep, 'phase'),
+    leakageCurrents: withUniqueIds(
+      leakageCurrents.map((leakage, index) => parseLeakageCurrent(leakage, index)),
+      'leakage',
     ),
   }
 
-  // The calculator expects at least one DeepSleep phase to remain present.
-  if (!nextState.phases.some((phase) => phase.isDeepSleep)) {
-    throw new Error('The imported configuration must include a DeepSleep phase.')
+  return {
+    state: nextState,
+    notices,
   }
-
-  return nextState
 }
