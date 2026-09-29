@@ -3,6 +3,13 @@ import { computed } from 'vue'
 import { useCalculatorStore } from '@/stores/calculator'
 import { useLocale } from '@/composables/useLocale'
 import { calculate } from '@/lib/calc'
+import {
+  formatActiveTime,
+  formatChargePerDay,
+  formatCount,
+  formatCurrentFromMilliAmps,
+  formatQuantity,
+} from '@/lib/format'
 import PhaseShareDonut from '@/components/Charts/PhaseShareDonut.vue'
 
 const store = useCalculatorStore()
@@ -11,6 +18,26 @@ const { i18n } = useLocale()
 const displayResult = computed(() =>
   calculate(store.battery, store.phases, store.leakageCurrents),
 )
+
+const averageCurrent = computed(() =>
+  formatCurrentFromMilliAmps(displayResult.value.averageCurrent_mA),
+)
+const dailyCharge = computed(() => formatChargePerDay(displayResult.value.totalmAhPerDay))
+
+function eventsLabel(events: number): string {
+  return events > 0 ? formatCount(events) : i18n.t('notAvailable')
+}
+
+function activeTimeLabel(seconds: number): string {
+  if (!(seconds > 0)) {
+    return i18n.t('auto')
+  }
+  return formatQuantity(formatActiveTime(seconds))
+}
+
+function isHighlighted(phaseId: string): boolean {
+  return store.highlightedPhaseId === phaseId
+}
 </script>
 
 <template>
@@ -57,7 +84,7 @@ const displayResult = computed(() =>
               <v-card-text class="pa-3">
                 <div class="text-body-2 text-medium-emphasis mb-1">{{ i18n.t('averageCurrent') }}</div>
                 <div class="text-h5 font-weight-medium">
-                  {{ displayResult.averageCurrent_mA.toFixed(3) }} <span class="text-body-1">mA</span>
+                  {{ averageCurrent.text }} <span class="text-body-1">{{ averageCurrent.unit }}</span>
                 </div>
               </v-card-text>
             </v-card>
@@ -66,7 +93,7 @@ const displayResult = computed(() =>
               <v-card-text class="pa-3">
                 <div class="text-body-2 text-medium-emphasis mb-1">{{ i18n.t('consumptionPerDay') }}</div>
                 <div class="text-h5 font-weight-medium">
-                  {{ displayResult.totalmAhPerDay.toFixed(2) }} <span class="text-body-1">mAh/day</span>
+                  {{ dailyCharge.text }} <span class="text-body-1">{{ dailyCharge.unit }}</span>
                 </div>
               </v-card-text>
             </v-card>
@@ -104,7 +131,7 @@ const displayResult = computed(() =>
                 <thead>
                   <tr>
                     <th class="text-body-2 font-weight-medium">{{ i18n.t('phase') }}</th>
-                    <th class="text-end text-body-2 font-weight-medium">mAh/day</th>
+                    <th class="text-end text-body-2 font-weight-medium">{{ i18n.t('chargePerDay') }}</th>
                     <th class="text-end text-body-2 font-weight-medium">{{ i18n.t('eventsPerDay') }}</th>
                     <th class="text-end text-body-2 font-weight-medium">{{ i18n.t('activeTimePerDay') }}</th>
                   </tr>
@@ -114,27 +141,24 @@ const displayResult = computed(() =>
                     v-for="result in displayResult.phaseResults"
                     :key="result.phaseId"
                     class="phase-breakdown-row"
-                    :class="{ 'phase-breakdown-row-highlighted': store.hoveredPhaseId === result.phaseId }"
+                    :class="{ 'phase-breakdown-row-highlighted': isHighlighted(result.phaseId) }"
                     :style="{
                       opacity:
-                        store.hoveredPhaseId === null || store.hoveredPhaseId === result.phaseId ? 1 : 0.3,
+                        store.highlightedPhaseId === null || isHighlighted(result.phaseId) ? 1 : 0.3,
                     }"
                     @mouseenter="store.setHoveredPhase(result.phaseId)"
                     @mouseleave="store.setHoveredPhase(null)"
+                    @click="store.togglePinnedPhase(result.phaseId)"
                   >
                     <td class="text-body-2">{{ result.phaseName }}</td>
                     <td class="text-end text-body-2">
-                      {{ result.mAhPerDay.toFixed(3) }}
+                      {{ formatQuantity(formatChargePerDay(result.mAhPerDay)) }}
                     </td>
                     <td class="text-end text-body-2">
-                      {{ result.eventsPerDay > 0 ? result.eventsPerDay.toFixed(1) : 'N/A' }}
+                      {{ eventsLabel(result.eventsPerDay) }}
                     </td>
                     <td class="text-end text-body-2">
-                      {{
-                        result.activeTimePerDaySeconds > 0
-                          ? (result.activeTimePerDaySeconds / 3600).toFixed(2) + ' h'
-                          : i18n.t('auto')
-                      }}
+                      {{ activeTimeLabel(result.activeTimePerDaySeconds) }}
                     </td>
                   </tr>
                 </tbody>

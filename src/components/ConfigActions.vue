@@ -4,8 +4,8 @@ import { useDisplay } from 'vuetify'
 import { useCalculatorStore } from '@/stores/calculator'
 import { useLocale } from '@/composables/useLocale'
 import { calculate } from '@/lib/calc'
-import { exportConfigAsJSON, exportResultsAsCSV } from '@/lib/export'
-import { importConfigFromJSON, type ImportNotice } from '@/lib/import'
+import { exportConfigAsJSON, exportResultsAsCSV, type CsvLabels } from '@/lib/export'
+import { ConfigImportError, importConfigFromJSON, type ImportNotice, type ImportResult } from '@/lib/import'
 import ConfigActionsMenu from '@/components/ConfigActionsMenu.vue'
 
 const store = useCalculatorStore()
@@ -16,6 +16,8 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const importMessage = ref('')
 const importStatus = ref<'success' | 'warning' | 'error'>('success')
 const isImportAlertVisible = ref(false)
+const isReplaceDialogVisible = ref(false)
+const pendingImport = ref<ImportResult | null>(null)
 
 const displayResult = computed(() =>
   calculate(store.battery, store.phases, store.leakageCurrents),
@@ -31,17 +33,54 @@ function exportConfig() {
   exportConfigAsJSON(store.state)
 }
 
+function csvLabels(): CsvLabels {
+  return {
+    metric: i18n.t('csvMetric'),
+    value: i18n.t('csvValue'),
+    unit: i18n.t('csvUnit'),
+    capacity: i18n.t('capacity'),
+    usableCapacity: i18n.t('usableCapacity'),
+    selfDischarge: i18n.t('selfDischarge'),
+    averageCurrent: i18n.t('averageCurrent'),
+    consumptionPerDay: i18n.t('consumptionPerDay'),
+    runtime: i18n.t('estimatedRuntime'),
+    days: i18n.t('days'),
+    weeks: i18n.t('weeks'),
+    months: i18n.t('months'),
+    years: i18n.t('years'),
+    phase: i18n.t('phase'),
+    eventsPerDay: i18n.t('eventsPerDay'),
+    activeTimePerDay: i18n.t('activeTimePerDay'),
+    notAvailable: i18n.t('notAvailable'),
+    auto: i18n.t('auto'),
+    unitMilliampHours: 'mAh',
+    unitPercent: '%',
+    unitPercentPerMonth: i18n.t('percentPerMonth'),
+  }
+}
+
 function exportResults() {
   if (!canExportResults.value) {
     return
   }
-  exportResultsAsCSV(displayResult.value)
+  exportResultsAsCSV(displayResult.value, store.battery, csvLabels())
 }
 
-function showImportStatus(type: 'success' | 'warning' | 'error', detailKey: string, detail?: string) {
+function showImportStatus(type: 'success' | 'warning' | 'error', message: string) {
   importStatus.value = type
-  importMessage.value = detail ? `${i18n.t(detailKey)} ${detail}` : i18n.t(detailKey)
+  importMessage.value = message
   isImportAlertVisible.value = true
+}
+
+function translateImportError(error: unknown): string {
+  if (!(error instanceof ConfigImportError)) {
+    return i18n.t('importError')
+  }
+
+  return Object.entries(error.params).reduce(
+    (message, [key, value]) => message.replace(new RegExp(`\\{${key}\\}`, 'g'), value),
+    i18n.t(error.code),
+  )
 }
 
 function formatImportNotices(notices: ImportNotice[]): string {
@@ -67,16 +106,34 @@ async function handleImportChange(event: Event) {
 
   try {
     const jsonText = await file.text()
-    const imported = importConfigFromJSON(jsonText)
-    store.replaceState(imported.state)
-    const notices = formatImportNotices(imported.notices)
-    showImportStatus(notices ? 'warning' : 'success', 'importSuccess', notices || undefined)
+    pendingImport.value = importConfigFromJSON(jsonText)
+    isReplaceDialogVisible.value = true
   } catch (error) {
-    const message = error instanceof Error ? error.message : i18n.t('importError')
-    showImportStatus('error', 'importError', message)
+    showImportStatus('error', translateImportError(error))
   } finally {
     input.value = ''
   }
+}
+
+function confirmImport() {
+  const imported = pendingImport.value
+  pendingImport.value = null
+  isReplaceDialogVisible.value = false
+  if (!imported) {
+    return
+  }
+
+  store.replaceState(imported.state)
+  const notices = formatImportNotices(imported.notices)
+  const summary = notices
+    ? `${i18n.t('importSuccess')} ${notices}`
+    : i18n.t('importSuccess')
+  showImportStatus(notices ? 'warning' : 'success', summary)
+}
+
+function cancelImport() {
+  pendingImport.value = null
+  isReplaceDialogVisible.value = false
 }
 </script>
 
@@ -142,6 +199,30 @@ async function handleImportChange(event: Event) {
         />
       </v-menu>
     </div>
+
+    <v-dialog
+      :model-value="isReplaceDialogVisible"
+      max-width="440"
+      @update:model-value="(open: boolean) => { if (!open) cancelImport() }"
+    >
+      <v-card>
+        <v-card-title class="text-h6 pa-4 pb-2">
+          {{ i18n.t('importReplaceTitle') }}
+        </v-card-title>
+        <v-card-text class="pa-4 pt-2">
+          {{ i18n.t('importReplaceBody') }}
+        </v-card-text>
+        <v-card-actions class="px-4 pb-4">
+          <v-spacer />
+          <v-btn variant="text" @click="cancelImport">
+            {{ i18n.t('cancel') }}
+          </v-btn>
+          <v-btn color="primary" variant="flat" @click="confirmImport">
+            {{ i18n.t('importReplaceConfirm') }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <v-snackbar
       v-model="isImportAlertVisible"

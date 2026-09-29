@@ -57,6 +57,17 @@ function stopEditing() {
 function handleNameUpdate(id: string, value: string) {
   updatePhase(id, { name: value })
 }
+
+function onPhaseClick(id: string, event: MouseEvent) {
+  if (event.detail > 1) {
+    return
+  }
+  store.togglePinnedPhase(id)
+}
+
+function isHighlighted(id: string): boolean {
+  return store.highlightedPhaseId === id
+}
 </script>
 
 <template>
@@ -71,10 +82,11 @@ function handleNameUpdate(id: string, value: string) {
         v-for="phase in deepSleepPhases"
         :key="phase.id"
         class="phase-card modern-card"
-        :class="{ 'phase-card-highlighted': store.hoveredPhaseId === phase.id }"
+        :class="{ 'phase-card-highlighted': isHighlighted(phase.id) }"
         elevation="1"
         @mouseenter="store.setHoveredPhase(phase.id)"
         @mouseleave="store.setHoveredPhase(null)"
+        @click="onPhaseClick(phase.id, $event)"
       >
         <v-card-title class="d-flex justify-space-between align-center pa-3 pb-2">
           <div class="d-flex align-center ga-2 flex-grow-1">
@@ -103,17 +115,6 @@ function handleNameUpdate(id: string, value: string) {
               @keydown.esc="stopEditing"
             />
           </div>
-          <v-tooltip location="top">
-            <template #activator="{ props: tooltipProps }">
-              <v-icon
-                icon="mdi-information-outline"
-                size="small"
-                color="info"
-                v-bind="tooltipProps"
-              />
-            </template>
-            <span>{{ i18n.t('deepSleepHint') }}</span>
-          </v-tooltip>
         </v-card-title>
         <v-card-text class="pa-3 pt-2">
           <div class="d-flex flex-column ga-2">
@@ -146,6 +147,9 @@ function handleNameUpdate(id: string, value: string) {
                 <v-btn value="A" size="small">A</v-btn>
               </v-btn-toggle>
             </div>
+            <p class="deep-sleep-note text-body-2 text-medium-emphasis mb-0">
+              {{ i18n.t('deepSleepHint') }}
+            </p>
           </div>
         </v-card-text>
       </v-card>
@@ -157,10 +161,11 @@ function handleNameUpdate(id: string, value: string) {
         v-for="phase in nonDeepSleepPhases"
         :key="phase.id"
         class="phase-card modern-card"
-        :class="{ 'phase-card-highlighted': store.hoveredPhaseId === phase.id }"
+        :class="{ 'phase-card-highlighted': isHighlighted(phase.id) }"
         elevation="1"
         @mouseenter="store.setHoveredPhase(phase.id)"
         @mouseleave="store.setHoveredPhase(null)"
+        @click="onPhaseClick(phase.id, $event)"
       >
         <v-card-title class="d-flex justify-space-between align-center pa-3 pb-2">
           <div class="d-flex align-center ga-2 flex-grow-1">
@@ -195,7 +200,7 @@ function handleNameUpdate(id: string, value: string) {
             color="error"
             size="small"
             density="compact"
-            @click="removePhase(phase.id)"
+            @click.stop="removePhase(phase.id)"
           />
         </v-card-title>
         <v-card-text class="pa-3 pt-2">
@@ -367,6 +372,10 @@ function handleNameUpdate(id: string, value: string) {
 
 .phase-title-input {
   flex-grow: 1;
+}
+
+.deep-sleep-note {
+  line-height: 1.4;
 }
 
 .phase-color-indicator {

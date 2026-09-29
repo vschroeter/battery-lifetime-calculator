@@ -1,74 +1,183 @@
-import type { CalculatorState, CalculationResult } from '@/types/calculator'
+import type { BatteryConfig, CalculationResult, CalculatorState } from '@/types/calculator'
+import {
+  formatActiveTime,
+  formatChargePerDay,
+  formatCount,
+  formatCurrentFromMilliAmps,
+  formatQuantity,
+} from '@/lib/format'
+
+export const CONFIG_FORMAT_VERSION = 1
+
+export interface CsvLabels {
+  metric: string
+  value: string
+  unit: string
+  capacity: string
+  usableCapacity: string
+  selfDischarge: string
+  averageCurrent: string
+  consumptionPerDay: string
+  runtime: string
+  days: string
+  weeks: string
+  months: string
+  years: string
+  phase: string
+  eventsPerDay: string
+  activeTimePerDay: string
+  notAvailable: string
+  auto: string
+  unitMilliampHours: string
+  unitPercent: string
+  unitPercentPerMonth: string
+}
+
+function downloadText(contents: string, filename: string, mimeType: string): void {
+  const dataBlob = new Blob([contents], { type: mimeType })
+  const url = URL.createObjectURL(dataBlob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+function fileDate(): string {
+  return new Date().toISOString().split('T')[0]!
+}
+
+export function serializeConfig(state: CalculatorState): string {
+  return JSON.stringify(
+    {
+      version: CONFIG_FORMAT_VERSION,
+      ...state,
+    },
+    null,
+    2,
+  )
+}
 
 /**
  * Export configuration as JSON
  */
 export function exportConfigAsJSON(state: CalculatorState): void {
-  const dataStr = JSON.stringify(state, null, 2)
-  const dataBlob = new Blob([dataStr], { type: 'application/json' })
-  const url = URL.createObjectURL(dataBlob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `battery-config-${new Date().toISOString().split('T')[0]}.json`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
+  downloadText(serializeConfig(state), `battery-config-${fileDate()}.json`, 'application/json')
+}
+
+function csvCell(value: string, asText = false): string {
+  let text = value
+  if (asText && /^[=+\-@]/.test(text)) {
+    text = `'${text}`
+  }
+  return `"${text.replace(/"/g, '""')}"`
+}
+
+function csvRow(cells: string[], textColumns: ReadonlySet<number> = new Set()): string {
+  return cells.map((cell, index) => csvCell(cell, textColumns.has(index))).join(',')
 }
 
 /**
- * Export calculation results as CSV
+ * Build the results CSV. Phase names are quoted, and names that Excel would
+ * treat as formulas are prefixed so the file stays a record of text.
  */
-export function exportResultsAsCSV(result: CalculationResult): void {
+export function buildResultsCsv(
+  result: CalculationResult,
+  battery: BatteryConfig,
+  labels: CsvLabels,
+): string {
+  const rows: string[] = []
+  const textFirstColumn = new Set([0])
+
+  rows.push(csvRow([labels.metric, labels.value, labels.unit], textFirstColumn))
+  rows.push(csvRow([
+    labels.capacity,
+    String(battery.capacity_mAh),
+    labels.unitMilliampHours,
+  ], textFirstColumn))
+  rows.push(csvRow([
+    labels.usableCapacity,
+    String(battery.usablePercent),
+    labels.unitPercent,
+  ], textFirstColumn))
+  rows.push(csvRow([
+    labels.selfDischarge,
+    String(battery.selfDischargePercentPerMonth),
+    labels.unitPercentPerMonth,
+  ], textFirstColumn))
+  rows.push(csvRow([
+    labels.averageCurrent,
+    formatCurrentFromMilliAmps(result.averageCurrent_mA).text,
+    formatCurrentFromMilliAmps(result.averageCurrent_mA).unit,
+  ], textFirstColumn))
+  rows.push(csvRow([
+    labels.consumptionPerDay,
+    formatChargePerDay(result.totalmAhPerDay).text,
+    formatChargePerDay(result.totalmAhPerDay).unit,
+  ], textFirstColumn))
+  rows.push(csvRow([
+    labels.runtime,
+    formatCount(result.runtimeDays),
+    labels.days,
+  ], textFirstColumn))
+  rows.push(csvRow([
+    labels.runtime,
+    formatCount(result.runtimeWeeks),
+    labels.weeks,
+  ], textFirstColumn))
+  rows.push(csvRow([
+    labels.runtime,
+    formatCount(result.runtimeMonths),
+    labels.months,
+  ], textFirstColumn))
+  rows.push(csvRow([
+    labels.runtime,
+    formatCount(result.runtimeYears),
+    labels.years,
+  ], textFirstColumn))
+
+  rows.push('')
+  rows.push(csvRow([
+    labels.phase,
+    labels.consumptionPerDay,
+    labels.eventsPerDay,
+    labels.activeTimePerDay,
+  ], textFirstColumn))
+
+  for (const phaseResult of result.phaseResults) {
+    const charge = formatChargePerDay(phaseResult.mAhPerDay)
+    const activeTime = phaseResult.activeTimePerDaySeconds > 0
+      ? formatQuantity(formatActiveTime(phaseResult.activeTimePerDaySeconds))
+      : labels.auto
+    rows.push(csvRow([
+      phaseResult.phaseName,
+      `${charge.text} ${charge.unit}`,
+      phaseResult.eventsPerDay > 0 ? formatCount(phaseResult.eventsPerDay) : labels.notAvailable,
+      activeTime,
+    ], textFirstColumn))
+  }
+
+  return `\uFEFF${rows.join('\n')}`
+}
+
+/**
+ * Export calculation results as CSV.
+ * The caller disables this action while the result still has errors.
+ */
+export function exportResultsAsCSV(
+  result: CalculationResult,
+  battery: BatteryConfig,
+  labels: CsvLabels,
+): void {
   if (result.errors.length > 0) {
-    alert('Cannot export: There are errors in the calculation.')
     return
   }
 
-  const rows: string[][] = []
-
-  // Header
-  rows.push(['Metric', 'Value', 'Unit'])
-
-  // KPIs
-  rows.push(['Average Current', result.averageCurrent_mA.toFixed(3), 'mA'])
-  rows.push(['Total Consumption per Day', result.totalmAhPerDay.toFixed(2), 'mAh/day'])
-  rows.push(['Runtime', result.runtimeDays.toFixed(1), 'days'])
-  rows.push(['Runtime', result.runtimeWeeks.toFixed(1), 'weeks'])
-  rows.push(['Runtime', result.runtimeMonths.toFixed(1), 'months'])
-
-  // Empty row
-  rows.push([])
-
-  // Phase breakdown header
-  rows.push(['Phase', 'mAh/day', 'Events/day', 'Active Time/day (h)'])
-
-  // Phase data
-  for (const phaseResult of result.phaseResults) {
-    rows.push([
-      phaseResult.phaseName,
-      phaseResult.mAhPerDay.toFixed(3),
-      phaseResult.eventsPerDay > 0 ? phaseResult.eventsPerDay.toFixed(1) : 'N/A',
-      phaseResult.activeTimePerDaySeconds > 0
-        ? (phaseResult.activeTimePerDaySeconds / 3600).toFixed(2)
-        : 'Auto',
-    ])
-  }
-
-  // Convert to CSV string
-  const csvContent = rows
-    .map((row) => row.map((cell) => `"${cell}"`).join(','))
-    .join('\n')
-
-  // Download
-  const dataBlob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(dataBlob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `battery-results-${new Date().toISOString().split('T')[0]}.csv`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
+  downloadText(
+    buildResultsCsv(result, battery, labels),
+    `battery-results-${fileDate()}.csv`,
+    'text/csv;charset=utf-8;',
+  )
 }
-

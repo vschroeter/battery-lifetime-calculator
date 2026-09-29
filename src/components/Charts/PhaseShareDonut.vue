@@ -4,6 +4,7 @@ import * as d3 from 'd3'
 import { useLocale } from '@/composables/useLocale'
 import { useCalculatorStore } from '@/stores/calculator'
 import { getColorForPhaseId } from '@/lib/phaseColors'
+import { formatChargePerDay, formatPercent, formatQuantity } from '@/lib/format'
 import type { PhaseResult } from '@/types/calculator'
 
 interface Props {
@@ -172,16 +173,19 @@ function renderChart() {
     .style('cursor', 'pointer')
     .style('transition', 'opacity 0.2s ease')
     .style('opacity', (d) => {
-      if (store.hoveredPhaseId === null) {
+      if (store.highlightedPhaseId === null) {
         return 1
       }
-      return store.hoveredPhaseId === d.data.phaseId ? 1 : 0.3
+      return store.highlightedPhaseId === d.data.phaseId ? 1 : 0.3
     })
-    .on('mouseenter', function (event, d) {
+    .on('mouseenter', function (_event, d) {
       store.setHoveredPhase(d.data.phaseId)
     })
     .on('mouseleave', function () {
       store.setHoveredPhase(null)
+    })
+    .on('click', function (_event, d) {
+      store.togglePinnedPhase(d.data.phaseId)
     })
 }
 
@@ -191,10 +195,10 @@ function updateArcStyles() {
   }
   const svg = d3.select(chartContainer.value)
   svg.selectAll<SVGPathElement, d3.PieArcDatum<PhaseResult>>('path.arc-path').style('opacity', function (d) {
-    if (store.hoveredPhaseId === null) {
+    if (store.highlightedPhaseId === null) {
       return 1
     }
-    return store.hoveredPhaseId === d.data.phaseId ? 1 : 0.3
+    return store.highlightedPhaseId === d.data.phaseId ? 1 : 0.3
   })
 }
 
@@ -218,7 +222,7 @@ watch(
 )
 
 watch(
-  () => store.hoveredPhaseId,
+  () => store.highlightedPhaseId,
   () => {
     updateArcStyles()
   },
@@ -245,24 +249,25 @@ const segments = computed(() => {
       {{ i18n.t('consumptionShareByPhase') }}
     </v-card-title>
     <v-card-text class="pa-3 pt-2">
-      <div v-if="total > 0" class="d-flex align-center ga-4">
+      <div v-if="total > 0" class="chart-layout">
         <svg
           ref="chartContainer"
           :width="width"
           :height="height"
           class="donut-chart"
         />
-        <div class="flex-grow-1">
+        <div class="chart-legend">
           <div
             v-for="seg in segments"
             :key="seg.phaseId"
             class="d-flex align-center mb-2 legend-entry"
-            :class="{ 'legend-entry-highlighted': store.hoveredPhaseId === seg.phaseId }"
+            :class="{ 'legend-entry-highlighted': store.highlightedPhaseId === seg.phaseId }"
             :style="{
-              opacity: store.hoveredPhaseId === null || store.hoveredPhaseId === seg.phaseId ? 1 : 0.3,
+              opacity: store.highlightedPhaseId === null || store.highlightedPhaseId === seg.phaseId ? 1 : 0.3,
             }"
             @mouseenter="store.setHoveredPhase(seg.phaseId)"
             @mouseleave="store.setHoveredPhase(null)"
+            @click="store.togglePinnedPhase(seg.phaseId)"
           >
             <div
               class="legend-color"
@@ -271,8 +276,8 @@ const segments = computed(() => {
               }"
             />
             <span class="ml-2 text-body-2">
-              {{ seg.phaseName }}: {{ seg.percentage.toFixed(1) }}%
-              ({{ seg.mAhPerDay.toFixed(2) }} mAh/day)
+              {{ seg.phaseName }}: {{ formatPercent(seg.percentage) }}
+              ({{ formatQuantity(formatChargePerDay(seg.mAhPerDay)) }})
             </span>
           </div>
         </div>
@@ -289,8 +294,20 @@ const segments = computed(() => {
   border-radius: 12px;
   border: 1px solid rgba(0, 0, 0, 0.08);
 }
+.chart-layout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
 .donut-chart {
-  flex-shrink: 0;
+  flex: 0 0 auto;
+}
+
+.chart-legend {
+  flex: 1 1 12rem;
+  min-width: min(100%, 12rem);
 }
 
 .legend-color {

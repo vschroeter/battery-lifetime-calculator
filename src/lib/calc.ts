@@ -211,8 +211,9 @@ export function calculate(
     return sum + current_mA * 24
   }, 0)
 
-  // Add leakage currents as a virtual phase result if present
-  if (leakageConsumption_mAhPerDay > 0.001) {
+  // Keep a leakage row whenever the user added a source that draws current,
+  // including nanoamp loads that sit far below 0.001 mAh/day.
+  if (leakageCurrents.length > 0 && leakageConsumption_mAhPerDay > 0) {
     const leakageLabels = leakageCurrents.map((l) => l.label || '').join(', ')
     phaseResults.push({
       phaseId: 'leakage-currents-virtual',
@@ -304,8 +305,8 @@ export function calculate(
       loadConsumption_mAhPerDay > 0 ? usableCapacity_mAh / loadConsumption_mAhPerDay : 0
   }
 
-  // Add self-discharge as a virtual phase result if it's significant
-  if (selfDischargeAvg_mAhPerDay > 0.001) {
+  // Keep self-discharge in the share whenever the model produces any draw.
+  if (selfDischargeAvg_mAhPerDay > 0) {
     phaseResults.push({
       phaseId: 'self-discharge-virtual',
       phaseName: 'Self-discharge',

@@ -7,6 +7,19 @@ import type {
   LeakageCurrent,
   Phase,
 } from '@/types/calculator'
+import { CONFIG_FORMAT_VERSION } from '@/lib/export'
+
+export class ConfigImportError extends Error {
+  readonly code: string
+  readonly params: Record<string, string>
+
+  constructor(code: string, params: Record<string, string> = {}) {
+    super(code)
+    this.name = 'ConfigImportError'
+    this.code = code
+    this.params = params
+  }
+}
 
 export type ImportNotice =
   | { code: 'droppedDeepSleep'; count: number }
@@ -54,7 +67,7 @@ function isFrequencyUnit(value: unknown): value is FrequencyUnit {
 
 function parseBatteryConfig(value: unknown): BatteryConfig {
   if (!isRecord(value)) {
-    throw new Error('Battery configuration is missing or invalid.')
+    throw new ConfigImportError('importInvalidBattery')
   }
 
   const { capacity_mAh, usablePercent, selfDischargePercentPerMonth } = value
@@ -64,7 +77,7 @@ function parseBatteryConfig(value: unknown): BatteryConfig {
     !isFiniteNumber(usablePercent) ||
     !isFiniteNumber(selfDischargePercentPerMonth)
   ) {
-    throw new Error('Battery configuration contains invalid numeric values.')
+    throw new ConfigImportError('importInvalidBatteryNumbers')
   }
 
   return {
@@ -76,7 +89,7 @@ function parseBatteryConfig(value: unknown): BatteryConfig {
 
 function parsePhase(value: unknown, index: number): Phase {
   if (!isRecord(value)) {
-    throw new Error(`Phase ${index + 1} is invalid.`)
+    throw new ConfigImportError('importInvalidPhase', { index: String(index + 1) })
   }
 
   const {
@@ -102,7 +115,7 @@ function parsePhase(value: unknown, index: number): Phase {
     !isFiniteNumber(frequency) ||
     !isFrequencyUnit(frequencyUnit)
   ) {
-    throw new Error(`Phase ${index + 1} contains invalid values.`)
+    throw new ConfigImportError('importInvalidPhaseValues', { index: String(index + 1) })
   }
 
   return {
@@ -120,7 +133,7 @@ function parsePhase(value: unknown, index: number): Phase {
 
 function parseLeakageCurrent(value: unknown, index: number): LeakageCurrent {
   if (!isRecord(value)) {
-    throw new Error(`Leakage current ${index + 1} is invalid.`)
+    throw new ConfigImportError('importInvalidLeakage', { index: String(index + 1) })
   }
 
   const { id, label, current, currentUnit } = value
@@ -131,7 +144,7 @@ function parseLeakageCurrent(value: unknown, index: number): LeakageCurrent {
     !isFiniteNumber(current) ||
     !isCurrentUnit(currentUnit)
   ) {
-    throw new Error(`Leakage current ${index + 1} contains invalid values.`)
+    throw new ConfigImportError('importInvalidLeakageValues', { index: String(index + 1) })
   }
 
   return {
@@ -198,17 +211,21 @@ export function importConfigFromJSON(jsonText: string): ImportResult {
   try {
     parsed = JSON.parse(jsonText)
   } catch {
-    throw new Error('The selected file is not valid JSON.')
+    throw new ConfigImportError('importInvalidJson')
   }
 
   if (!isRecord(parsed)) {
-    throw new Error('The selected file does not contain a calculator configuration.')
+    throw new ConfigImportError('importNotConfig')
+  }
+
+  if ('version' in parsed && parsed.version !== CONFIG_FORMAT_VERSION) {
+    throw new ConfigImportError('importUnsupportedVersion')
   }
 
   const { battery, phases, leakageCurrents } = parsed
 
   if (!Array.isArray(phases) || !Array.isArray(leakageCurrents)) {
-    throw new Error('The selected file does not match the exported configuration format.')
+    throw new ConfigImportError('importFormatMismatch')
   }
 
   const notices: ImportNotice[] = []

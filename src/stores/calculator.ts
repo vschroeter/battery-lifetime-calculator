@@ -41,6 +41,8 @@ export const useCalculatorStore = defineStore('calculator', () => {
   ])
 
   const hoveredPhaseId = ref<string | null>(null)
+  const pinnedPhaseId = ref<string | null>(null)
+  const highlightedPhaseId = computed(() => hoveredPhaseId.value ?? pinnedPhaseId.value)
 
   const leakageCurrents = ref<LeakageCurrent[]>([])
 
@@ -110,6 +112,8 @@ export const useCalculatorStore = defineStore('calculator', () => {
       },
     ]
     leakageCurrents.value = []
+    hoveredPhaseId.value = null
+    pinnedPhaseId.value = null
   }
 
   function replaceState(nextState: CalculatorState) {
@@ -118,10 +122,15 @@ export const useCalculatorStore = defineStore('calculator', () => {
     phases.value = nextState.phases.map((phase) => ({ ...phase }))
     leakageCurrents.value = nextState.leakageCurrents.map((leakage) => ({ ...leakage }))
     hoveredPhaseId.value = null
+    pinnedPhaseId.value = null
   }
 
   function setHoveredPhase(id: string | null) {
     hoveredPhaseId.value = id
+  }
+
+  function togglePinnedPhase(id: string) {
+    pinnedPhaseId.value = pinnedPhaseId.value === id ? null : id
   }
 
   function addLeakageCurrent(leakage: Omit<LeakageCurrent, 'id'>) {
@@ -151,6 +160,8 @@ export const useCalculatorStore = defineStore('calculator', () => {
     battery,
     phases,
     hoveredPhaseId,
+    pinnedPhaseId,
+    highlightedPhaseId,
     leakageCurrents,
     state,
     updateBattery,
@@ -161,6 +172,7 @@ export const useCalculatorStore = defineStore('calculator', () => {
     resetToESP32Preset,
     replaceState,
     setHoveredPhase,
+    togglePinnedPhase,
     addLeakageCurrent,
     updateLeakageCurrent,
     removeLeakageCurrent,
