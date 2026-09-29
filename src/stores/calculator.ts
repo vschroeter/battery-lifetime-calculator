@@ -112,6 +112,14 @@ export const useCalculatorStore = defineStore('calculator', () => {
     leakageCurrents.value = []
   }
 
+  function replaceState(nextState: CalculatorState) {
+    // Clone imported data so the store owns its next state.
+    battery.value = { ...nextState.battery }
+    phases.value = nextState.phases.map((phase) => ({ ...phase }))
+    leakageCurrents.value = nextState.leakageCurrents.map((leakage) => ({ ...leakage }))
+    hoveredPhaseId.value = null
+  }
+
   function setHoveredPhase(id: string | null) {
     hoveredPhaseId.value = id
   }
@@ -151,6 +159,7 @@ export const useCalculatorStore = defineStore('calculator', () => {
     removePhase,
     removeAllPhases,
     resetToESP32Preset,
+    replaceState,
     setHoveredPhase,
     addLeakageCurrent,
     updateLeakageCurrent,
