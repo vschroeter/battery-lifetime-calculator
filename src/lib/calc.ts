@@ -5,6 +5,8 @@ import type {
   CalculationResult,
   LeakageCurrent,
 } from '@/types/calculator'
+import { isLegal } from '@/lib/fields'
+import { LEAKAGE_PHASE_ID } from '@/lib/leakage'
 import {
   convertCurrentTo_mA,
   convertDurationToHours,
@@ -13,6 +15,8 @@ import {
 } from '@/lib/units'
 
 const SECONDS_PER_DAY = 86400
+/** A sum this close to 24 h still closes the day, so float noise is not an over-budget profile. */
+const DAY_BUDGET_TOLERANCE_SECONDS = 0.001
 const DAYS_PER_WEEK = 7
 const DAYS_PER_MONTH = 30.4368491667 // From tropical year having 365.24219 days
 const MONTHS_PER_YEAR = 12
@@ -72,40 +76,37 @@ function calculatePhaseConsumption(phase: Phase): {
 }
 
 /**
- * Calculate DeepSleep consumption
+ * Deep-sleep remainder when active averages fit in one day.
+ * Returns null when the sum is more than 1 ms over 24 h.
+ * A sum within 1 ms of 24 h is an empty remainder, not an open day.
  */
-function calculateDeepSleepConsumption(
-  phases: Phase[],
-  deepSleepPhase: Phase,
-): {
-  mAhPerDay: number
-  activeTimePerDaySeconds: number
-} {
-  // Calculate total active time per day from all non-DeepSleep phases
-  let totalActiveTimeSeconds = 0
-
-  for (const phase of phases) {
-    if (!phase.isDeepSleep) {
-      const result = calculatePhaseConsumption(phase)
-      totalActiveTimeSeconds += result.activeTimePerDaySeconds
-    }
+function closedDayRemainder(activeTimePerDaySeconds: number): number | null {
+  const activeMilliseconds = Math.round(activeTimePerDaySeconds * 1000)
+  const dayMilliseconds = SECONDS_PER_DAY * 1000
+  const toleranceMilliseconds = DAY_BUDGET_TOLERANCE_SECONDS * 1000
+  const excessMilliseconds = activeMilliseconds - dayMilliseconds
+  if (excessMilliseconds > toleranceMilliseconds) {
+    return null
   }
+  if (Math.abs(excessMilliseconds) <= toleranceMilliseconds) {
+    return 0
+  }
+  return (dayMilliseconds - activeMilliseconds) / 1000
+}
 
-  const deepSleepTimeSeconds = Math.max(
-    0,
-    SECONDS_PER_DAY - totalActiveTimeSeconds,
-  )
-  const deepSleepTimeHours = deepSleepTimeSeconds / 3600
-  const deepSleepCurrent_mA = convertCurrentTo_mA(
-    deepSleepPhase.current,
-    deepSleepPhase.currentUnit,
-  )
-
-  const mAhPerDay = deepSleepCurrent_mA * deepSleepTimeHours
-
+function emptyResult(errors: string[], warnings: string[]): CalculationResult {
   return {
-    mAhPerDay,
-    activeTimePerDaySeconds: deepSleepTimeSeconds,
+    phaseResults: [],
+    totalmAhPerDay: 0,
+    averageCurrent_mA: 0,
+    runtimeDays: 0,
+    runtimeWeeks: 0,
+    runtimeMonths: 0,
+    runtimeYears: 0,
+    errors,
+    warnings,
+    dayBudgetExceeded: false,
+    activeTimePerDaySeconds: 0,
   }
 }
 
@@ -116,42 +117,111 @@ export function calculate(
   battery: BatteryConfig,
   phases: Phase[],
   leakageCurrents: LeakageCurrent[] = [],
+  leakageEnabled = true,
 ): CalculationResult {
   const errors: string[] = []
   const warnings: string[] = []
 
   // Validate battery
-  if (battery.capacity_mAh <= 0) {
+  if (!isLegal('positive', battery.capacity_mAh)) {
     errors.push('Battery capacity must be greater than 0')
   }
-  if (battery.usablePercent < 1 || battery.usablePercent > 100) {
+  if (!isLegal('usableRange', battery.usablePercent)) {
     errors.push('Usable capacity percentage must be between 1 and 100')
   }
-  if (battery.selfDischargePercentPerMonth < 0 || battery.selfDischargePercentPerMonth >= 100) {
+  if (!isLegal('selfDischargeRange', battery.selfDischargePercentPerMonth)) {
     errors.push('Self-discharge rate must be between 0 and 100 (exclusive)')
   }
+  if (!isLegal('efficiencyRange', battery.efficiencyPercent)) {
+    errors.push('Regulator efficiency must be greater than 0 and at most 100')
+  }
 
-  // Validate phases
+  const deepSleepPhases = phases.filter((phase) => phase.isDeepSleep)
+  if (deepSleepPhases.length !== 1) {
+    errors.push('Exactly one DeepSleep phase is required.')
+  }
+
+  // Validate phases. Current may be 0. Duration and frequency may not.
   for (const phase of phases) {
-    if (phase.current <= 0) {
-      errors.push(`Phase "${phase.name}": Current must be greater than 0`)
+    if (!isLegal('nonNegative', phase.current)) {
+      errors.push(`Phase "${phase.name}": Current must be greater than or equal to 0`)
     }
     if (!phase.isDeepSleep) {
-      if (phase.duration <= 0) {
+      if (!isLegal('positive', phase.duration)) {
         errors.push(`Phase "${phase.name}": Duration must be greater than 0`)
       }
-      if (!phase.frequency || phase.frequency <= 0) {
-        errors.push(
-          `Phase "${phase.name}": Frequency must be greater than 0`,
-        )
+      if (!isLegal('positive', phase.frequency)) {
+        errors.push(`Phase "${phase.name}": Frequency must be greater than 0`)
       }
     }
   }
 
-  // If there are errors, return early
+  for (const leakage of leakageCurrents) {
+    if (!isLegal('nonNegative', leakage.current)) {
+      errors.push(`Leakage "${leakage.label}": Current must be greater than or equal to 0`)
+    }
+  }
+
+  // Field errors block every row. The day-budget case is handled after this.
   if (errors.length > 0) {
+    return emptyResult(errors, warnings)
+  }
+
+  // Phase currents are load-side. Efficiency scales them to the battery.
+  // Leakage and self-discharge are already battery-side and stay unscaled.
+  const phaseScale = 100 / battery.efficiencyPercent
+
+  // Calculate phase results
+  const phaseResults: PhaseResult[] = []
+  let totalActiveTimeSeconds = 0
+
+  // Process non-DeepSleep phases
+  for (const phase of phases) {
+    if (!phase.isDeepSleep && phase.enabled !== false) {
+      const result = calculatePhaseConsumption(phase)
+      totalActiveTimeSeconds += result.activeTimePerDaySeconds
+
+      phaseResults.push({
+        phaseId: phase.id,
+        phaseName: phase.name,
+        mAhPerDay: result.mAhPerDay * phaseScale,
+        eventsPerDay: result.eventsPerDay,
+        activeTimePerDaySeconds: result.activeTimePerDaySeconds,
+      })
+    }
+  }
+
+  const deepSleepTimeSeconds = closedDayRemainder(totalActiveTimeSeconds)
+
+  function appendLeakage() {
+    // Permanent load, outside the 24 h phase budget: current × 24 h.
+    // Sources stay on the total. They are not separate rows in the daily sum.
+    const leakageSources = leakageCurrents.map((leakage) => ({
+      id: leakage.id,
+      label: leakage.label,
+      mAhPerDay: convertCurrentTo_mA(leakage.current, leakage.currentUnit) * 24,
+    }))
+    const leakageConsumption_mAhPerDay = leakageSources.reduce(
+      (sum, source) => sum + source.mAhPerDay,
+      0,
+    )
+
+    if (leakageEnabled && leakageCurrents.length > 0 && leakageConsumption_mAhPerDay > 0) {
+      phaseResults.push({
+        phaseId: LEAKAGE_PHASE_ID,
+        phaseName: '',
+        mAhPerDay: leakageConsumption_mAhPerDay,
+        eventsPerDay: 0,
+        activeTimePerDaySeconds: SECONDS_PER_DAY,
+        leakageSources,
+      })
+    }
+  }
+
+  if (deepSleepTimeSeconds === null) {
+    appendLeakage()
     return {
-      phaseResults: [],
+      phaseResults,
       totalmAhPerDay: 0,
       averageCurrent_mA: 0,
       runtimeDays: 0,
@@ -160,68 +230,23 @@ export function calculate(
       runtimeYears: 0,
       errors,
       warnings,
+      dayBudgetExceeded: true,
+      activeTimePerDaySeconds: totalActiveTimeSeconds,
     }
   }
 
-  // Calculate phase results
-  const phaseResults: PhaseResult[] = []
-  let totalActiveTimeSeconds = 0
-
-  // Process non-DeepSleep phases
-  for (const phase of phases) {
-    if (!phase.isDeepSleep) {
-      const result = calculatePhaseConsumption(phase)
-      totalActiveTimeSeconds += result.activeTimePerDaySeconds
-
-      phaseResults.push({
-        phaseId: phase.id,
-        phaseName: phase.name,
-        mAhPerDay: result.mAhPerDay,
-        eventsPerDay: result.eventsPerDay,
-        activeTimePerDaySeconds: result.activeTimePerDaySeconds,
-      })
-    }
-  }
-
-  // Check if active time exceeds 24 hours
-  if (totalActiveTimeSeconds > SECONDS_PER_DAY) {
-    warnings.push(
-      `Total active time per day (${(totalActiveTimeSeconds / 3600).toFixed(2)} h) exceeds 24 hours. DeepSleep will be 0.`,
-    )
-  }
-
-  // Process DeepSleep phase(s)
-  const deepSleepPhases = phases.filter((p) => p.isDeepSleep)
-  for (const deepSleepPhase of deepSleepPhases) {
-    const result = calculateDeepSleepConsumption(phases, deepSleepPhase)
-    phaseResults.push({
-      phaseId: deepSleepPhase.id,
-      phaseName: deepSleepPhase.name,
-      mAhPerDay: result.mAhPerDay,
-      eventsPerDay: 0,
-      activeTimePerDaySeconds: result.activeTimePerDaySeconds,
-    })
-    totalActiveTimeSeconds += result.activeTimePerDaySeconds
-  }
-
-  // Calculate leakage current consumption (permanent load, 24 hours per day)
-  const leakageConsumption_mAhPerDay = leakageCurrents.reduce((sum, leakage) => {
-    const current_mA = convertCurrentTo_mA(leakage.current, leakage.currentUnit)
-    // Permanent load: current * 24 hours
-    return sum + current_mA * 24
-  }, 0)
-
-  // Add leakage currents as a virtual phase result if present
-  if (leakageConsumption_mAhPerDay > 0.001) {
-    const leakageLabels = leakageCurrents.map((l) => l.label || '').join(', ')
-    phaseResults.push({
-      phaseId: 'leakage-currents-virtual',
-      phaseName: `Sum of Leakage Currents${leakageLabels ? ` (${leakageLabels})` : ''}`,
-      mAhPerDay: leakageConsumption_mAhPerDay,
-      eventsPerDay: 0,
-      activeTimePerDaySeconds: SECONDS_PER_DAY, // 24 hours
-    })
-  }
+  const deepSleepPhase = deepSleepPhases[0]!
+  const deepSleepCurrent_mA = deepSleepPhase.enabled === false
+    ? 0
+    : convertCurrentTo_mA(deepSleepPhase.current, deepSleepPhase.currentUnit)
+  phaseResults.push({
+    phaseId: deepSleepPhase.id,
+    phaseName: deepSleepPhase.name,
+    mAhPerDay: deepSleepCurrent_mA * (deepSleepTimeSeconds / 3600) * phaseScale,
+    eventsPerDay: 0,
+    activeTimePerDaySeconds: deepSleepTimeSeconds,
+  })
+  appendLeakage()
 
   // Calculate load consumption from phases and leakage currents
   const loadConsumption_mAhPerDay = phaseResults.reduce(
@@ -304,8 +329,8 @@ export function calculate(
       loadConsumption_mAhPerDay > 0 ? usableCapacity_mAh / loadConsumption_mAhPerDay : 0
   }
 
-  // Add self-discharge as a virtual phase result if it's significant
-  if (selfDischargeAvg_mAhPerDay > 0.001) {
+  // Keep self-discharge in the share whenever the model produces any draw.
+  if (selfDischargeAvg_mAhPerDay > 0) {
     phaseResults.push({
       phaseId: 'self-discharge-virtual',
       phaseName: 'Self-discharge',
@@ -336,6 +361,8 @@ export function calculate(
     runtimeYears,
     errors,
     warnings,
+    dayBudgetExceeded: false,
+    activeTimePerDaySeconds: totalActiveTimeSeconds,
   }
 }
 

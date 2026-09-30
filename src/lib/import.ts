@@ -1,12 +1,34 @@
 import type {
   BatteryConfig,
   CalculatorState,
+  ChemistryId,
   CurrentUnit,
   DurationUnit,
+  EfficiencyPresetId,
   FrequencyUnit,
   LeakageCurrent,
   Phase,
 } from '@/types/calculator'
+import {
+  efficiencyPresetById,
+  findCell,
+  isChemistryId,
+  isEfficiencyPresetId,
+} from '@/lib/batteryPresets'
+import { CONFIG_FORMAT_VERSION } from '@/lib/export'
+import { FREQUENCY_UNITS } from '@/lib/units'
+
+export class ConfigImportError extends Error {
+  readonly code: string
+  readonly params: Record<string, string>
+
+  constructor(code: string, params: Record<string, string> = {}) {
+    super(code)
+    this.name = 'ConfigImportError'
+    this.code = code
+    this.params = params
+  }
+}
 
 export type ImportNotice =
   | { code: 'droppedDeepSleep'; count: number }
@@ -30,7 +52,7 @@ const DEFAULT_DEEP_SLEEP: Omit<Phase, 'id'> = {
 
 const CURRENT_UNITS = new Set<CurrentUnit>(['nA', 'µA', 'mA', 'A'])
 const DURATION_UNITS = new Set<DurationUnit>(['ms', 's', 'min', 'h'])
-const FREQUENCY_UNITS = new Set<FrequencyUnit>(['perHour', 'perDay', 'perWeek'])
+const FREQUENCY_UNIT_SET = new Set<FrequencyUnit>(FREQUENCY_UNITS)
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -49,12 +71,27 @@ function isDurationUnit(value: unknown): value is DurationUnit {
 }
 
 function isFrequencyUnit(value: unknown): value is FrequencyUnit {
-  return typeof value === 'string' && FREQUENCY_UNITS.has(value as FrequencyUnit)
+  return typeof value === 'string' && FREQUENCY_UNIT_SET.has(value as FrequencyUnit)
 }
 
+function parseNullableId(value: unknown, known: (id: string) => boolean): string | null {
+  if (value === undefined || value === null || value === '') {
+    return null
+  }
+  if (typeof value !== 'string' || !known(value)) {
+    throw new ConfigImportError('importInvalidBattery')
+  }
+  return value
+}
+
+/**
+ * A file from before presets omits efficiency entirely and loads as 100%
+ * with the “already at the battery” preset. A stored percent keeps an empty
+ * preset empty, including when that percent is 100.
+ */
 function parseBatteryConfig(value: unknown): BatteryConfig {
   if (!isRecord(value)) {
-    throw new Error('Battery configuration is missing or invalid.')
+    throw new ConfigImportError('importInvalidBattery')
   }
 
   const { capacity_mAh, usablePercent, selfDischargePercentPerMonth } = value
@@ -64,19 +101,48 @@ function parseBatteryConfig(value: unknown): BatteryConfig {
     !isFiniteNumber(usablePercent) ||
     !isFiniteNumber(selfDischargePercentPerMonth)
   ) {
-    throw new Error('Battery configuration contains invalid numeric values.')
+    throw new ConfigImportError('importInvalidBatteryNumbers')
+  }
+
+  const chemistryId = parseNullableId(value.chemistryId, isChemistryId) as ChemistryId | null
+  const cellId = parseNullableId(value.cellId, (id) => findCell(chemistryId, id) !== null)
+  if (cellId !== null && chemistryId === null) {
+    throw new ConfigImportError('importInvalidBattery')
+  }
+
+  let efficiencyPercent = 100
+  let efficiencyPresetId: EfficiencyPresetId | null = 'at-battery'
+  if ('efficiencyPercent' in value) {
+    if (!isFiniteNumber(value.efficiencyPercent)) {
+      throw new ConfigImportError('importInvalidBatteryNumbers')
+    }
+    efficiencyPercent = value.efficiencyPercent
+    efficiencyPresetId = parseNullableId(
+      value.efficiencyPresetId,
+      isEfficiencyPresetId,
+    ) as EfficiencyPresetId | null
+    if (
+      efficiencyPresetId !== null &&
+      efficiencyPresetById(efficiencyPresetId).percent !== efficiencyPercent
+    ) {
+      efficiencyPresetId = null
+    }
   }
 
   return {
     capacity_mAh,
     usablePercent,
     selfDischargePercentPerMonth,
+    efficiencyPercent,
+    chemistryId,
+    cellId,
+    efficiencyPresetId,
   }
 }
 
 function parsePhase(value: unknown, index: number): Phase {
   if (!isRecord(value)) {
-    throw new Error(`Phase ${index + 1} is invalid.`)
+    throw new ConfigImportError('importInvalidPhase', { index: String(index + 1) })
   }
 
   const {
@@ -89,6 +155,7 @@ function parsePhase(value: unknown, index: number): Phase {
     durationUnit,
     frequency,
     frequencyUnit,
+    enabled,
   } = value
 
   if (
@@ -102,7 +169,7 @@ function parsePhase(value: unknown, index: number): Phase {
     !isFiniteNumber(frequency) ||
     !isFrequencyUnit(frequencyUnit)
   ) {
-    throw new Error(`Phase ${index + 1} contains invalid values.`)
+    throw new ConfigImportError('importInvalidPhaseValues', { index: String(index + 1) })
   }
 
   return {
@@ -115,12 +182,13 @@ function parsePhase(value: unknown, index: number): Phase {
     durationUnit,
     frequency,
     frequencyUnit,
+    enabled: typeof enabled === 'boolean' ? enabled : true,
   }
 }
 
 function parseLeakageCurrent(value: unknown, index: number): LeakageCurrent {
   if (!isRecord(value)) {
-    throw new Error(`Leakage current ${index + 1} is invalid.`)
+    throw new ConfigImportError('importInvalidLeakage', { index: String(index + 1) })
   }
 
   const { id, label, current, currentUnit } = value
@@ -131,7 +199,7 @@ function parseLeakageCurrent(value: unknown, index: number): LeakageCurrent {
     !isFiniteNumber(current) ||
     !isCurrentUnit(currentUnit)
   ) {
-    throw new Error(`Leakage current ${index + 1} contains invalid values.`)
+    throw new ConfigImportError('importInvalidLeakageValues', { index: String(index + 1) })
   }
 
   return {
@@ -198,17 +266,21 @@ export function importConfigFromJSON(jsonText: string): ImportResult {
   try {
     parsed = JSON.parse(jsonText)
   } catch {
-    throw new Error('The selected file is not valid JSON.')
+    throw new ConfigImportError('importInvalidJson')
   }
 
   if (!isRecord(parsed)) {
-    throw new Error('The selected file does not contain a calculator configuration.')
+    throw new ConfigImportError('importNotConfig')
   }
 
-  const { battery, phases, leakageCurrents } = parsed
+  if ('version' in parsed && parsed.version !== CONFIG_FORMAT_VERSION) {
+    throw new ConfigImportError('importUnsupportedVersion')
+  }
+
+  const { battery, phases, leakageCurrents, leakageEnabled } = parsed
 
   if (!Array.isArray(phases) || !Array.isArray(leakageCurrents)) {
-    throw new Error('The selected file does not match the exported configuration format.')
+    throw new ConfigImportError('importFormatMismatch')
   }
 
   const notices: ImportNotice[] = []
@@ -232,6 +304,7 @@ export function importConfigFromJSON(jsonText: string): ImportResult {
       leakageCurrents.map((leakage, index) => parseLeakageCurrent(leakage, index)),
       'leakage',
     ),
+    leakageEnabled: typeof leakageEnabled === 'boolean' ? leakageEnabled : true,
   }
 
   return {

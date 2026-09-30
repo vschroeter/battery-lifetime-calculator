@@ -14,7 +14,7 @@ const activePhase = computed(() => {
 
 const baseResult = computed(() => {
   if (!activePhase.value) return null
-  return calculate(store.battery, store.phases, store.leakageCurrents)
+  return calculate(store.battery, store.phases, store.leakageCurrents, store.leakageEnabled)
 })
 
 const sensitivityResults = computed(() => {
@@ -37,7 +37,7 @@ const sensitivityResults = computed(() => {
       return p
     })
 
-    const result = calculate(store.battery, modifiedPhases, store.leakageCurrents)
+    const result = calculate(store.battery, modifiedPhases, store.leakageCurrents, store.leakageEnabled)
     if (result.errors.length === 0) {
       const runtimeChange = ((result.runtimeDays - baseRuntime) / baseRuntime) * 100
       results.push({
@@ -120,14 +120,14 @@ function getBarColor(change: number): string {
 <style scoped>
 .sensitivity-item {
   padding: 8px;
-  background-color: #f5f5f5;
+  background-color: rgba(var(--v-theme-on-surface), 0.06);
   border-radius: 4px;
 }
 
 .sensitivity-bar-container {
   width: 100%;
   height: 8px;
-  background-color: #e0e0e0;
+  background-color: rgba(var(--v-theme-on-surface), 0.16);
   border-radius: 4px;
   display: flex;
   align-items: center;

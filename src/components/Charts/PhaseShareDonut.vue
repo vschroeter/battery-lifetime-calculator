@@ -4,6 +4,9 @@ import * as d3 from 'd3'
 import { useLocale } from '@/composables/useLocale'
 import { useCalculatorStore } from '@/stores/calculator'
 import { getColorForPhaseId } from '@/lib/phaseColors'
+import { leakageAggregateName, leakageShareLit, LEAKAGE_PHASE_ID } from '@/lib/leakage'
+import { getMessage } from '@/i18n/messages'
+import { formatChargePerDay, formatPercent, formatQuantity } from '@/lib/format'
 import type { PhaseResult } from '@/types/calculator'
 
 interface Props {
@@ -11,18 +14,23 @@ interface Props {
 }
 
 const props = defineProps<Props>()
-const { i18n } = useLocale()
+const { i18n, locale } = useLocale()
 const store = useCalculatorStore()
 
 const chartContainer = ref<SVGElement | null>(null)
 
+// A zero-charge slice, including a deep-sleep remainder of 0 mAh, is omitted.
+const shareResults = computed(() =>
+  props.phaseResults.filter((result) => result.mAhPerDay > 0),
+)
+
 const total = computed(() =>
-  props.phaseResults.reduce((sum, r) => sum + r.mAhPerDay, 0),
+  shareResults.value.reduce((sum, r) => sum + r.mAhPerDay, 0),
 )
 
 // Sort phases by share (mAhPerDay) descending
 const sortedPhaseResults = computed(() =>
-  [...props.phaseResults].sort((a, b) => b.mAhPerDay - a.mAhPerDay),
+  [...shareResults.value].sort((a, b) => b.mAhPerDay - a.mAhPerDay),
 )
 
 // Get all non-DeepSleep phases to determine color indices
@@ -45,11 +53,36 @@ const DEEPSLEEP_WIDTH = 20 // Thinnest
 // Outer radius (same for all)
 const outerRadius = Math.min(width, height) / 2
 
+const leakageSourceIds = computed(() =>
+  props.phaseResults.find((result) => result.phaseId === LEAKAGE_PHASE_ID)?.leakageSources?.map((source) => source.id) ?? [],
+)
+
+function shareOpaque(phaseId: string): number {
+  const highlighted = store.highlightedPhaseId
+  if (highlighted === null) {
+    return 1
+  }
+  if (phaseId === LEAKAGE_PHASE_ID) {
+    return leakageShareLit(highlighted, leakageSourceIds.value) ? 1 : 0.3
+  }
+  return highlighted === phaseId ? 1 : 0.3
+}
+
+function segmentName(result: PhaseResult): string {
+  if (result.phaseId === LEAKAGE_PHASE_ID && result.leakageSources) {
+    return leakageAggregateName(result.leakageSources, {
+      group: getMessage(locale.value, 'leakageCurrents'),
+      source: getMessage(locale.value, 'leakageSourceNumber'),
+    })
+  }
+  return result.phaseName
+}
+
 function getPhaseType(result: PhaseResult): 'active' | 'self-discharge' | 'leakage-current' | 'deepsleep' {
   if (result.phaseId === 'self-discharge-virtual') {
     return 'self-discharge'
   }
-  if (result.phaseId === 'leakage-currents-virtual') {
+  if (result.phaseId === LEAKAGE_PHASE_ID) {
     return 'leakage-current'
   }
   const phase = store.phases.find((p) => p.id === result.phaseId)
@@ -74,7 +107,7 @@ function getInnerRadius(phaseType: 'active' | 'self-discharge' | 'leakage-curren
 
 function getColorForPhaseResult(result: PhaseResult): string {
   // Handle virtual phases (leakage currents, self-discharge)
-  if (result.phaseId === 'leakage-currents-virtual' || result.phaseId === 'self-discharge-virtual') {
+  if (result.phaseId === LEAKAGE_PHASE_ID || result.phaseId === 'self-discharge-virtual') {
     return getColorForPhaseId(
       result.phaseId,
       nonDeepSleepPhases.value.map((p) => p.id),
@@ -165,19 +198,12 @@ function renderChart() {
     .append('path')
     .attr('d', (d) => getArc(d)?.(d) ?? '')
     .attr('fill', (d) => getColorForPhaseResult(d.data))
-    .attr('stroke', 'white')
     .attr('stroke-width', 1)
     .attr('class', (d) => `arc-path arc-${d.data.phaseId}`)
     .attr('data-phase-id', (d) => d.data.phaseId)
-    .style('cursor', 'pointer')
     .style('transition', 'opacity 0.2s ease')
-    .style('opacity', (d) => {
-      if (store.hoveredPhaseId === null) {
-        return 1
-      }
-      return store.hoveredPhaseId === d.data.phaseId ? 1 : 0.3
-    })
-    .on('mouseenter', function (event, d) {
+    .style('opacity', (d) => shareOpaque(d.data.phaseId))
+    .on('mouseenter', function (_event, d) {
       store.setHoveredPhase(d.data.phaseId)
     })
     .on('mouseleave', function () {
@@ -191,10 +217,7 @@ function updateArcStyles() {
   }
   const svg = d3.select(chartContainer.value)
   svg.selectAll<SVGPathElement, d3.PieArcDatum<PhaseResult>>('path.arc-path').style('opacity', function (d) {
-    if (store.hoveredPhaseId === null) {
-      return 1
-    }
-    return store.hoveredPhaseId === d.data.phaseId ? 1 : 0.3
+    return shareOpaque(d.data.phaseId)
   })
 }
 
@@ -218,7 +241,7 @@ watch(
 )
 
 watch(
-  () => store.hoveredPhaseId,
+  () => store.highlightedPhaseId,
   () => {
     updateArcStyles()
   },
@@ -233,6 +256,7 @@ const segments = computed(() => {
     const percentage = (result.mAhPerDay / total.value) * 100
     return {
       ...result,
+      phaseName: segmentName(result),
       percentage,
     }
   })
@@ -245,22 +269,20 @@ const segments = computed(() => {
       {{ i18n.t('consumptionShareByPhase') }}
     </v-card-title>
     <v-card-text class="pa-3 pt-2">
-      <div v-if="total > 0" class="d-flex align-center ga-4">
+      <div v-if="total > 0" class="chart-layout">
         <svg
           ref="chartContainer"
           :width="width"
           :height="height"
           class="donut-chart"
         />
-        <div class="flex-grow-1">
+        <div class="chart-legend">
           <div
             v-for="seg in segments"
             :key="seg.phaseId"
             class="d-flex align-center mb-2 legend-entry"
-            :class="{ 'legend-entry-highlighted': store.hoveredPhaseId === seg.phaseId }"
-            :style="{
-              opacity: store.hoveredPhaseId === null || store.hoveredPhaseId === seg.phaseId ? 1 : 0.3,
-            }"
+            :class="{ 'legend-entry-highlighted': shareOpaque(seg.phaseId) === 1 && store.highlightedPhaseId !== null }"
+            :style="{ opacity: shareOpaque(seg.phaseId) }"
             @mouseenter="store.setHoveredPhase(seg.phaseId)"
             @mouseleave="store.setHoveredPhase(null)"
           >
@@ -271,8 +293,8 @@ const segments = computed(() => {
               }"
             />
             <span class="ml-2 text-body-2">
-              {{ seg.phaseName }}: {{ seg.percentage.toFixed(1) }}%
-              ({{ seg.mAhPerDay.toFixed(2) }} mAh/day)
+              {{ seg.phaseName }}: {{ formatPercent(seg.percentage) }}
+              ({{ formatQuantity(formatChargePerDay(seg.mAhPerDay)) }})
             </span>
           </div>
         </div>
@@ -287,10 +309,26 @@ const segments = computed(() => {
 <style scoped>
 .modern-card {
   border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
 }
+.chart-layout {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+}
+
 .donut-chart {
-  flex-shrink: 0;
+  flex: 0 0 auto;
+}
+
+.donut-chart :deep(.arc-path) {
+  stroke: rgb(var(--v-theme-surface));
+}
+
+.chart-legend {
+  flex: 1 1 12rem;
+  min-width: min(100%, 12rem);
 }
 
 .legend-color {
@@ -301,14 +339,14 @@ const segments = computed(() => {
 }
 
 .legend-entry {
-  cursor: pointer;
+  cursor: default;
   transition: opacity 0.2s ease;
   padding: 2px 4px;
   border-radius: 4px;
 }
 
 .legend-entry-highlighted {
-  background-color: rgba(0, 0, 0, 0.05);
+  background-color: rgba(var(--v-theme-on-surface), 0.08);
 }
 </style>
 

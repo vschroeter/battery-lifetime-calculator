@@ -6,6 +6,7 @@ import BatteryForm from '@/components/BatteryForm.vue'
 import ConfigActions from '@/components/ConfigActions.vue'
 import PhasesEditor from '@/components/PhasesEditor.vue'
 import ResultsPanel from '@/components/ResultsPanel.vue'
+import ThemeMenu from '@/components/ThemeMenu.vue'
 import { useI18nLite } from '@/composables/useI18n'
 import { useCalculatorStore } from '@/stores/calculator'
 
@@ -19,9 +20,11 @@ const hasNonDeepSleepPhases = computed(() =>
 )
 
 const activeTab = ref('inputs')
+const isRemoveAllDialogVisible = ref(false)
 
-function removeAllPhases() {
+function confirmRemoveAllPhases() {
   store.removeAllPhases()
+  isRemoveAllDialogVisible.value = false
 }
 
 provide('locale', locale)
@@ -30,7 +33,7 @@ provide('i18n', i18n)
 
 <template>
   <v-app>
-      <v-app-bar color="primary" prominent>
+      <v-app-bar class="app-bar" color="header" prominent>
       <v-img
         src="/icons/BatteryIcon.svg"
         max-width="40"
@@ -38,17 +41,18 @@ provide('i18n', i18n)
         class="mr-3 flex-shrink-0"
         alt="Battery Icon"
       />
-      <v-spacer v-if="!display.mdAndDown.value" />
-      <v-app-bar-title class="app-title">{{ i18n.t('appTitle') }}</v-app-bar-title>
-      <v-spacer v-if="!display.mdAndDown.value" />
       <v-btn
-        class="header-trailing flex-shrink-0"
+        class="flex-shrink-0"
         icon="mdi-github"
         variant="text"
         href="https://github.com/vschroeter/battery-lifetime-calculator"
         target="_blank"
         rel="noopener noreferrer"
       />
+      <v-spacer v-if="!display.mdAndDown.value" />
+      <v-app-bar-title class="app-title">{{ i18n.t('appTitle') }}</v-app-bar-title>
+      <v-spacer v-if="!display.mdAndDown.value" />
+      <ConfigActions class="header-trailing" />
       <v-btn
         class="header-trailing flex-shrink-0"
         prepend-icon="mdi-translate"
@@ -57,7 +61,9 @@ provide('i18n', i18n)
       >
         {{ locale === 'de' ? 'EN' : 'DE' }}
       </v-btn>
-      <ConfigActions />
+      <div class="header-trailing flex-shrink-0">
+        <ThemeMenu />
+      </div>
     </v-app-bar>
 
     <v-main class="main-content">
@@ -100,7 +106,7 @@ provide('i18n', i18n)
                             density="compact"
                             :disabled="!hasNonDeepSleepPhases"
                             v-bind="tooltipProps"
-                            @click="removeAllPhases"
+                            @click="isRemoveAllDialogVisible = true"
                           />
                         </template>
                         <span>{{ i18n.t('removeAllPhases') }}</span>
@@ -153,7 +159,7 @@ provide('i18n', i18n)
                           density="compact"
                           :disabled="!hasNonDeepSleepPhases"
                           v-bind="tooltipProps"
-                          @click="removeAllPhases"
+                          @click="isRemoveAllDialogVisible = true"
                         />
                       </template>
                       <span>{{ i18n.t('removeAllPhases') }}</span>
@@ -175,6 +181,26 @@ provide('i18n', i18n)
         </v-container>
       </template>
     </v-main>
+
+    <v-dialog v-model="isRemoveAllDialogVisible" max-width="440">
+      <v-card>
+        <v-card-title class="text-h6 pa-4 pb-2">
+          {{ i18n.t('removeAllPhasesTitle') }}
+        </v-card-title>
+        <v-card-text class="pa-4 pt-2">
+          {{ i18n.t('removeAllPhasesBody') }}
+        </v-card-text>
+        <v-card-actions class="px-4 pb-4">
+          <v-spacer />
+          <v-btn variant="text" @click="isRemoveAllDialogVisible = false">
+            {{ i18n.t('cancel') }}
+          </v-btn>
+          <v-btn color="error" variant="flat" @click="confirmRemoveAllPhases">
+            {{ i18n.t('removeAllPhases') }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </v-app>
 </template>
 
@@ -202,14 +228,14 @@ provide('i18n', i18n)
     transform: translateX(-50%);
   }
 
-  .header-trailing {
+  .app-bar :deep(.header-trailing) {
     order: 1;
   }
 }
 
 .modern-card {
   border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
 }
 
 /* Main content area - fixed height based on viewport */
@@ -230,7 +256,7 @@ provide('i18n', i18n)
 
 .tabs-header {
   flex-shrink: 0;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12);
 }
 
 .tabs-body {

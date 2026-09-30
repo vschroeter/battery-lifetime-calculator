@@ -3,15 +3,51 @@ import { computed } from 'vue'
 import { useCalculatorStore } from '@/stores/calculator'
 import { useLocale } from '@/composables/useLocale'
 import { LEAKAGE_CURRENT_COLOR } from '@/lib/phaseColors'
+import NumericField from '@/components/NumericField.vue'
+import { useFieldMessage } from '@/composables/useFieldMessage'
+import { leakageFieldKey } from '@/lib/fields'
+import { leakageSourceLit, LEAKAGE_PHASE_ID } from '@/lib/leakage'
 import type { CurrentUnit } from '@/types/calculator'
 
 const store = useCalculatorStore()
 const { i18n } = useLocale()
+const { message } = useFieldMessage()
 
 const leakageCurrents = computed(() => store.leakageCurrents)
 const hasLeakageCurrents = computed(() => leakageCurrents.value.length > 0)
-const LEAKAGE_CURRENT_PHASE_ID = 'leakage-currents-virtual'
-const isLeakageCurrentHovered = computed(() => store.hoveredPhaseId === LEAKAGE_CURRENT_PHASE_ID)
+const isLeakageGroupHighlighted = computed(
+  () => store.highlightedPhaseId === LEAKAGE_PHASE_ID,
+)
+
+function sourceRowHighlighted(id: string): boolean {
+  return store.highlightedPhaseId !== null && leakageSourceLit(store.highlightedPhaseId, id)
+}
+
+function onCardEnter(event: MouseEvent) {
+  const target = event.target
+  if (target instanceof Element && target.closest('.leakage-row')) {
+    return
+  }
+  store.setHoveredPhase(LEAKAGE_PHASE_ID)
+}
+
+function onSourceEnter(id: string) {
+  store.setHoveredPhase(id)
+}
+
+function onSourceLeave(event: MouseEvent) {
+  const row = event.currentTarget
+  const next = event.relatedTarget
+  if (row instanceof Node && next instanceof Node && row.contains(next)) {
+    return
+  }
+  const card = row instanceof Element ? row.closest('.leakage-currents-card') : null
+  if (card && next instanceof Node && card.contains(next)) {
+    store.setHoveredPhase(LEAKAGE_PHASE_ID)
+    return
+  }
+  store.setHoveredPhase(null)
+}
 
 function addLeakageCurrent() {
   store.addLeakageCurrent({
@@ -38,18 +74,30 @@ function updateLeakageCurrent(id: string, updates: Partial<{ label: string; curr
   <div class="mb-3">
     <v-card
       class="leakage-currents-card modern-card"
-      :class="{ 'leakage-card-highlighted': isLeakageCurrentHovered }"
+      :class="{ 'leakage-card-highlighted': isLeakageGroupHighlighted }"
       elevation="1"
-      @mouseenter="store.setHoveredPhase(LEAKAGE_CURRENT_PHASE_ID)"
+      @mouseenter="onCardEnter"
       @mouseleave="store.setHoveredPhase(null)"
     >
       <v-card-title class="d-flex justify-space-between align-center pa-3 pb-2">
         <div class="d-flex align-center ga-2">
+          <v-switch
+            :model-value="store.leakageEnabled"
+            color="success"
+            density="compact"
+            hide-details
+            inset
+            class="phase-enable"
+            :aria-label="i18n.t('includeInCalculation')"
+            @click.stop
+            @update:model-value="store.setLeakageEnabled($event === true)"
+          />
+          <div class="heading-divider" aria-hidden="true" />
           <div
             class="phase-color-indicator"
             :style="{ backgroundColor: LEAKAGE_CURRENT_COLOR }"
           />
-          <span>{{ i18n.t('leakageCurrents') }}</span>
+          <span class="panel-title">{{ i18n.t('leakageCurrents') }}</span>
         </div>
         <div class="d-flex align-center ga-1">
           <v-tooltip location="top">
@@ -73,35 +121,30 @@ function updateLeakageCurrent(id: string, updates: Partial<{ label: string; curr
                 density="compact"
                 :disabled="!hasLeakageCurrents"
                 v-bind="tooltipProps"
-                @click="removeAllLeakageCurrents"
+                @click.stop="removeAllLeakageCurrents"
               />
             </template>
             <span>{{ i18n.t('removeAllLeakageCurrents') }}</span>
           </v-tooltip>
         </div>
       </v-card-title>
-      <v-card-text class="pa-3 pt-2">
+      <v-card-text class="pa-3 pt-2" :class="{ 'phase-body-off': !store.leakageEnabled }">
         <div class="d-flex flex-column ga-1">
           <div
             v-for="leakage in leakageCurrents"
             :key="leakage.id"
-            class="leakage-row d-flex ga-2 align-center"
-            @mouseenter="store.setHoveredPhase(LEAKAGE_CURRENT_PHASE_ID)"
-            @mouseleave="store.setHoveredPhase(null)"
+            class="leakage-row"
+            :class="{ 'leakage-row-highlighted': sourceRowHighlighted(leakage.id) }"
+            @mouseenter="onSourceEnter(leakage.id)"
+            @mouseleave="onSourceLeave"
           >
 
-            <v-text-field
+            <NumericField
               :model-value="leakage.current"
               :label="i18n.t('current')"
-              type="number"
-              variant="outlined"
-              density="compact"
-              hide-details="auto"
-              class="flex-grow-1"
-              style="min-width: 150px"
-              @update:model-value="
-                updateLeakageCurrent(leakage.id, { current: Number($event) })
-              "
+              :error-message="message(leakageFieldKey(leakage.id))"
+              class="leakage-current-field"
+              @commit="store.commitLeakageCurrent(leakage.id, $event)"
             />
             <v-btn-toggle
               :model-value="leakage.currentUnit"
@@ -126,7 +169,6 @@ function updateLeakageCurrent(id: string, updates: Partial<{ label: string; curr
               density="compact"
               hide-details="auto"
               class="label-field"
-              style="min-width: 120px"
               @update:model-value="
                 updateLeakageCurrent(leakage.id, { label: $event })
               "
@@ -137,7 +179,8 @@ function updateLeakageCurrent(id: string, updates: Partial<{ label: string; curr
               color="error"
               size="small"
               density="compact"
-              @click="removeLeakageCurrent(leakage.id)"
+              class="leakage-delete"
+              @click.stop="removeLeakageCurrent(leakage.id)"
             />
           </div>
 
@@ -147,7 +190,7 @@ function updateLeakageCurrent(id: string, updates: Partial<{ label: string; curr
               prepend-icon="mdi-plus"
               variant="outlined"
               size="small"
-              @click="addLeakageCurrent"
+              @click.stop="addLeakageCurrent"
             >
               {{ i18n.t('addLeakageCurrent') }}
             </v-btn>
@@ -159,9 +202,16 @@ function updateLeakageCurrent(id: string, updates: Partial<{ label: string; curr
 </template>
 
 <style scoped>
+.panel-title {
+  font-size: 1.25rem;
+  font-weight: 500;
+  letter-spacing: 0.0125em;
+  line-height: 1.5rem;
+}
+
 .modern-card {
   border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
 }
 
 .leakage-currents-card {
@@ -178,17 +228,33 @@ function updateLeakageCurrent(id: string, updates: Partial<{ label: string; curr
 }
 
 .leakage-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   padding: 8px;
   border-radius: 8px;
   transition: background-color 0.2s;
 }
 
 .leakage-row:hover {
-  background-color: rgba(0, 0, 0, 0.02);
+  background-color: rgba(var(--v-theme-on-surface), 0.06);
 }
 
+.leakage-row-highlighted {
+  background-color: rgba(var(--v-theme-primary), 0.08);
+}
+
+.leakage-current-field,
 .label-field {
+  flex: 1 1 9rem;
+  min-width: min(100%, 9rem);
+  max-width: 100%;
+}
+
+.leakage-delete {
   flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .phase-color-indicator {
@@ -196,7 +262,29 @@ function updateLeakageCurrent(id: string, updates: Partial<{ label: string; curr
   height: 16px;
   border-radius: 3px;
   flex-shrink: 0;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.16);
+}
+
+.heading-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 6px 0 2px;
+  background: rgba(var(--v-theme-on-surface), 0.16);
+  flex: 0 0 auto;
+}
+
+.phase-enable {
+  flex: 0 0 auto;
+  transform: scale(0.8);
+  transform-origin: left center;
+}
+
+.phase-enable :deep(.v-selection-control) {
+  min-height: 22px;
+}
+
+.phase-body-off {
+  opacity: 0.48;
 }
 
 /* Prevent text capitalization in unit toggle buttons */
@@ -207,8 +295,9 @@ function updateLeakageCurrent(id: string, updates: Partial<{ label: string; curr
 
 /* Stretch button toggle groups to fill available space */
 .unit-toggle {
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 1 1 11rem;
+  max-width: 100%;
+  min-width: min(100%, 11rem);
 }
 
 .unit-toggle :deep(.v-btn-toggle__wrapper) {
@@ -221,26 +310,4 @@ function updateLeakageCurrent(id: string, updates: Partial<{ label: string; curr
   min-width: 0;
 }
 
-/* Responsive: Stack inputs on small screens */
-@media (max-width: 600px) {
-  .leakage-row {
-    flex-wrap: wrap;
-  }
-  .leakage-row > * {
-    flex-basis: 100% !important;
-    min-width: 100% !important;
-  }
-}
-
-/* Ensure side-by-side layout on md+ screens */
-@media (min-width: 600px) {
-  .label-field {
-    flex: 0 0 150px;
-    max-width: 150px;
-  }
-  .leakage-row > .flex-grow-1 {
-    flex-basis: calc(50% - 8px);
-    max-width: calc(50% - 8px);
-  }
-}
 </style>
