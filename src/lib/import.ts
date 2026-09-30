@@ -1,12 +1,20 @@
 import type {
   BatteryConfig,
   CalculatorState,
+  ChemistryId,
   CurrentUnit,
   DurationUnit,
+  EfficiencyPresetId,
   FrequencyUnit,
   LeakageCurrent,
   Phase,
 } from '@/types/calculator'
+import {
+  efficiencyPresetById,
+  findCell,
+  isChemistryId,
+  isEfficiencyPresetId,
+} from '@/lib/batteryPresets'
 import { CONFIG_FORMAT_VERSION } from '@/lib/export'
 import { FREQUENCY_UNITS } from '@/lib/units'
 
@@ -66,6 +74,21 @@ function isFrequencyUnit(value: unknown): value is FrequencyUnit {
   return typeof value === 'string' && FREQUENCY_UNIT_SET.has(value as FrequencyUnit)
 }
 
+function parseNullableId(value: unknown, known: (id: string) => boolean): string | null {
+  if (value === undefined || value === null || value === '') {
+    return null
+  }
+  if (typeof value !== 'string' || !known(value)) {
+    throw new ConfigImportError('importInvalidBattery')
+  }
+  return value
+}
+
+/**
+ * A file from before presets omits efficiency entirely and loads as 100%
+ * with the “already at the battery” preset. A stored percent keeps an empty
+ * preset empty, including when that percent is 100.
+ */
 function parseBatteryConfig(value: unknown): BatteryConfig {
   if (!isRecord(value)) {
     throw new ConfigImportError('importInvalidBattery')
@@ -81,10 +104,39 @@ function parseBatteryConfig(value: unknown): BatteryConfig {
     throw new ConfigImportError('importInvalidBatteryNumbers')
   }
 
+  const chemistryId = parseNullableId(value.chemistryId, isChemistryId) as ChemistryId | null
+  const cellId = parseNullableId(value.cellId, (id) => findCell(chemistryId, id) !== null)
+  if (cellId !== null && chemistryId === null) {
+    throw new ConfigImportError('importInvalidBattery')
+  }
+
+  let efficiencyPercent = 100
+  let efficiencyPresetId: EfficiencyPresetId | null = 'at-battery'
+  if ('efficiencyPercent' in value) {
+    if (!isFiniteNumber(value.efficiencyPercent)) {
+      throw new ConfigImportError('importInvalidBatteryNumbers')
+    }
+    efficiencyPercent = value.efficiencyPercent
+    efficiencyPresetId = parseNullableId(
+      value.efficiencyPresetId,
+      isEfficiencyPresetId,
+    ) as EfficiencyPresetId | null
+    if (
+      efficiencyPresetId !== null &&
+      efficiencyPresetById(efficiencyPresetId).percent !== efficiencyPercent
+    ) {
+      efficiencyPresetId = null
+    }
+  }
+
   return {
     capacity_mAh,
     usablePercent,
     selfDischargePercentPerMonth,
+    efficiencyPercent,
+    chemistryId,
+    cellId,
+    efficiencyPresetId,
   }
 }
 

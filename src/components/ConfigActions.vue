@@ -4,6 +4,7 @@ import { useDisplay } from 'vuetify'
 import { useCalculatorStore } from '@/stores/calculator'
 import { useLocale } from '@/composables/useLocale'
 import { useProfileUrl } from '@/composables/useProfileUrl'
+import { cellLabelKey, chemistryLabelKey } from '@/lib/batteryPresets'
 import { exportConfigAsJSON, exportResultsAsCSV, type CsvLabels } from '@/lib/export'
 import { ConfigImportError, importConfigFromJSON, type ImportNotice, type ImportResult } from '@/lib/import'
 import ConfigActionsMenu from '@/components/ConfigActionsMenu.vue'
@@ -49,6 +50,15 @@ function csvLabels(): CsvLabels {
     capacity: i18n.t('capacity'),
     usableCapacity: i18n.t('usableCapacity'),
     selfDischarge: i18n.t('selfDischarge'),
+    efficiency: i18n.t('efficiency'),
+    chemistry: i18n.t('chemistry'),
+    cell: i18n.t('cell'),
+    chemistryValue: store.battery.chemistryId
+      ? i18n.t(chemistryLabelKey(store.battery.chemistryId))
+      : i18n.t('presetCustom'),
+    cellValue: store.battery.cellId
+      ? i18n.t(cellLabelKey(store.battery.chemistryId, store.battery.cellId))
+      : i18n.t('presetCustom'),
     averageCurrent: i18n.t('averageCurrent'),
     consumptionPerDay: i18n.t('consumptionPerDay'),
     runtime: i18n.t('estimatedRuntime'),

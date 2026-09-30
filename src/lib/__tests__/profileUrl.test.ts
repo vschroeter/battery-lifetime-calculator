@@ -112,6 +112,50 @@ describe('profile URL', () => {
     ).toThrow(ConfigImportError)
   })
 
+  it('reads a pre-preset battery as 100% already at the battery', () => {
+    const token = encodeProfileValue([
+      1,
+      [1000, 80, 0],
+      [
+        ['Active', 0, 80, 2, 0.2, 1, 1, 0],
+        ['DeepSleep', 1, 0.01, 2],
+      ],
+      [],
+    ])
+    const decoded = decodeProfileToken(token)
+    expect(decoded.state.battery).toMatchObject({
+      efficiencyPercent: 100,
+      chemistryId: null,
+      cellId: null,
+      efficiencyPresetId: 'at-battery',
+    })
+  })
+
+  it('keeps a stored 100% with an empty efficiency preset empty', () => {
+    const state = createExampleProfile()
+    state.battery = { ...state.battery, efficiencyPresetId: null }
+    const decoded = decodeProfileToken(profileTokenFromHash(encodeProfileHash(state))!)
+    expect(decoded.state.battery.efficiencyPercent).toBe(100)
+    expect(decoded.state.battery.efficiencyPresetId).toBeNull()
+    expect(encodeProfileHash(decoded.state)).toBe(encodeProfileHash(state))
+  })
+
+  it('round-trips a chemistry and its cell', () => {
+    const state = createExampleProfile()
+    state.battery = {
+      ...state.battery,
+      chemistryId: 'li-socl2',
+      cellId: 'aa',
+      capacity_mAh: 2600,
+      usablePercent: 85,
+      selfDischargePercentPerMonth: 0.08,
+      efficiencyPercent: 90,
+      efficiencyPresetId: 'buck',
+    }
+    const decoded = decodeProfileToken(profileTokenFromHash(encodeProfileHash(state))!)
+    expect(decoded.state.battery).toMatchObject(state.battery)
+  })
+
   it('ignores a hash that is not a profile link', () => {
     expect(profileTokenFromHash('')).toBeNull()
     expect(profileTokenFromHash('#section')).toBeNull()

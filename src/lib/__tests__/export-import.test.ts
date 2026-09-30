@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { calculate } from '@/lib/calc'
+import { createExampleProfile } from '@/lib/exampleProfile'
 import { buildResultsCsv, CONFIG_FORMAT_VERSION, serializeConfig, type CsvLabels } from '@/lib/export'
 import { ConfigImportError, importConfigFromJSON } from '@/lib/import'
 import type { BatteryConfig, CalculatorState, Phase } from '@/types/calculator'
@@ -11,6 +12,11 @@ const labels: CsvLabels = {
   capacity: 'Capacity',
   usableCapacity: 'Usable Capacity',
   selfDischarge: 'Self-Discharge',
+  efficiency: 'Efficiency',
+  chemistry: 'Chemistry',
+  cell: 'Cell',
+  chemistryValue: 'Custom',
+  cellValue: 'Custom',
   averageCurrent: 'Average Current',
   consumptionPerDay: 'Consumption per Day',
   runtime: 'Estimated Runtime',
@@ -31,8 +37,7 @@ const labels: CsvLabels = {
 }
 
 const battery: BatteryConfig = {
-  capacity_mAh: 1000,
-  usablePercent: 80,
+  ...createExampleProfile().battery,
   selfDischargePercentPerMonth: 1,
 }
 
@@ -80,6 +85,9 @@ describe('buildResultsCsv', () => {
     expect(csv).toContain('"Capacity","1000","mAh"')
     expect(csv).toContain('"Usable Capacity","80","%"')
     expect(csv).toContain('"Self-Discharge","1","%/month"')
+    expect(csv).toContain('"Efficiency","100","%"')
+    expect(csv).toContain('"Chemistry","Custom",""')
+    expect(csv).toContain('"Cell","Custom",""')
     expect(csv).toContain('"years"')
     expect(csv).not.toContain('0.00 h')
   })
@@ -165,6 +173,42 @@ describe('importConfigFromJSON', () => {
     }
     const imported = importConfigFromJSON(stateJson(interval, CONFIG_FORMAT_VERSION))
     expect(imported.state.phases[0]).toMatchObject({ frequency: 1, frequencyUnit: 'everyHour' })
+  })
+
+  it('loads a file from before presets as 100% already at the battery', () => {
+    const legacy = JSON.parse(stateJson(state)) as {
+      battery: Record<string, unknown>
+    }
+    delete legacy.battery.efficiencyPercent
+    delete legacy.battery.chemistryId
+    delete legacy.battery.cellId
+    delete legacy.battery.efficiencyPresetId
+
+    const imported = importConfigFromJSON(JSON.stringify(legacy))
+    expect(imported.state.battery.efficiencyPercent).toBe(100)
+    expect(imported.state.battery.efficiencyPresetId).toBe('at-battery')
+    expect(imported.state.battery.chemistryId).toBeNull()
+    expect(imported.state.battery.cellId).toBeNull()
+  })
+
+  it('keeps an explicit 100% with an empty preset empty', () => {
+    const cleared = {
+      ...state,
+      battery: { ...state.battery, efficiencyPercent: 100, efficiencyPresetId: null },
+    }
+    const imported = importConfigFromJSON(stateJson(cleared))
+    expect(imported.state.battery.efficiencyPresetId).toBeNull()
+    expect(imported.state.battery.efficiencyPercent).toBe(100)
+  })
+
+  it('drops an efficiency preset that does not match its percent', () => {
+    const drifted = {
+      ...state,
+      battery: { ...state.battery, efficiencyPercent: 91, efficiencyPresetId: 'buck' as const },
+    }
+    const imported = importConfigFromJSON(stateJson(drifted))
+    expect(imported.state.battery.efficiencyPercent).toBe(91)
+    expect(imported.state.battery.efficiencyPresetId).toBeNull()
   })
 
   it('round-trips the serialized config', () => {

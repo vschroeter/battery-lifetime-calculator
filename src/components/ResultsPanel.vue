@@ -17,6 +17,7 @@ import {
   LEAKAGE_PHASE_ID,
   type LeakageNameLabels,
 } from '@/lib/leakage'
+import { batteryFieldKey } from '@/lib/fields'
 import { getMessage } from '@/i18n/messages'
 import PhaseShareDonut from '@/components/Charts/PhaseShareDonut.vue'
 import type { PhaseResult } from '@/types/calculator'
@@ -74,6 +75,11 @@ function formatBudgetSeconds(seconds: number): string {
   }
   return rounded.toFixed(3).replace(/0+$/, '').replace(/\.$/, '')
 }
+
+const showEfficiencyCaption = computed(() => {
+  const efficiency = store.resolvedNumber(batteryFieldKey('efficiencyPercent'))
+  return displayResult.value !== null && efficiency !== null && efficiency !== 100
+})
 
 const dayBudgetMessage = computed(() => {
   const seconds = displayResult.value?.activeTimePerDaySeconds ?? 0
@@ -269,6 +275,12 @@ function isHighlighted(row: TableRow): boolean {
             <v-card-title class="text-subtitle-1 pa-3 pb-2">
               {{ i18n.t('consumptionByPhase') }}
             </v-card-title>
+            <p
+              v-if="showEfficiencyCaption"
+              class="text-body-2 text-medium-emphasis px-3 mb-0"
+            >
+              {{ i18n.t('efficiencyResultCaption') }}
+            </p>
             <p
               v-if="displayResult.dayBudgetExceeded"
               class="text-body-2 text-medium-emphasis px-3 mb-0"

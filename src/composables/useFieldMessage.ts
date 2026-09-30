@@ -7,6 +7,7 @@ const RULE_MESSAGE: Record<FieldRule, string> = {
   positive: 'fieldPositive',
   usableRange: 'fieldUsableRange',
   selfDischargeRange: 'fieldSelfDischargeRange',
+  efficiencyRange: 'fieldEfficiencyRange',
 }
 
 export function useFieldMessage() {

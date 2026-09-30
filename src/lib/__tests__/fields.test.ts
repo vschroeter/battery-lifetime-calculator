@@ -1,14 +1,11 @@
 import { describe, expect, it } from 'vitest'
+import { createExampleProfile } from '@/lib/exampleProfile'
 import { evaluateProfile, legalSnapshot, phaseFieldKey } from '@/lib/fields'
 import type { CalculatorState } from '@/types/calculator'
 
 function state(overrides: Partial<CalculatorState> = {}): CalculatorState {
   return {
-    battery: {
-      capacity_mAh: 1000,
-      usablePercent: 80,
-      selfDischargePercentPerMonth: 0,
-    },
+    battery: createExampleProfile().battery,
     phases: [
       {
         id: 'active-1',

@@ -1,6 +1,11 @@
 import type { BatteryConfig, CalculatorState, Phase } from '@/types/calculator'
 
-export type FieldRule = 'nonNegative' | 'positive' | 'usableRange' | 'selfDischargeRange'
+export type FieldRule =
+  | 'nonNegative'
+  | 'positive'
+  | 'usableRange'
+  | 'selfDischargeRange'
+  | 'efficiencyRange'
 
 export interface FieldIssue {
   key: string
@@ -20,12 +25,18 @@ export function isLegal(rule: FieldRule, value: number): boolean {
       return value >= 1 && value <= 100
     case 'selfDischargeRange':
       return value >= 0 && value < 100
+    case 'efficiencyRange':
+      return value > 0 && value <= 100
   }
 }
 
-export function batteryFieldKey(
-  field: 'capacity_mAh' | 'usablePercent' | 'selfDischargePercentPerMonth',
-): string {
+export type BatteryNumberField =
+  | 'capacity_mAh'
+  | 'usablePercent'
+  | 'selfDischargePercentPerMonth'
+  | 'efficiencyPercent'
+
+export function batteryFieldKey(field: BatteryNumberField): string {
   switch (field) {
     case 'capacity_mAh':
       return 'battery.capacity'
@@ -33,12 +44,12 @@ export function batteryFieldKey(
       return 'battery.usablePercent'
     case 'selfDischargePercentPerMonth':
       return 'battery.selfDischarge'
+    case 'efficiencyPercent':
+      return 'battery.efficiency'
   }
 }
 
-export function batteryFieldRule(
-  field: 'capacity_mAh' | 'usablePercent' | 'selfDischargePercentPerMonth',
-): FieldRule {
+export function batteryFieldRule(field: BatteryNumberField): FieldRule {
   switch (field) {
     case 'capacity_mAh':
       return 'positive'
@@ -46,6 +57,8 @@ export function batteryFieldRule(
       return 'usableRange'
     case 'selfDischargePercentPerMonth':
       return 'selfDischargeRange'
+    case 'efficiencyPercent':
+      return 'efficiencyRange'
   }
 }
 
@@ -72,7 +85,12 @@ export function legalSnapshot(state: CalculatorState): Record<string, number> {
 }
 
 function rememberBattery(snapshot: Record<string, number>, battery: BatteryConfig) {
-  const fields = ['capacity_mAh', 'usablePercent', 'selfDischargePercentPerMonth'] as const
+  const fields = [
+    'capacity_mAh',
+    'usablePercent',
+    'selfDischargePercentPerMonth',
+    'efficiencyPercent',
+  ] as const
   for (const field of fields) {
     const value = battery[field]
     if (isLegal(batteryFieldRule(field), value)) {
@@ -133,7 +151,19 @@ export function evaluateProfile(
     lastLegal,
     issues,
   )
-  if (capacity === null || usablePercent === null || selfDischarge === null) {
+  const efficiencyPercent = substitute(
+    batteryFieldKey('efficiencyPercent'),
+    state.battery.efficiencyPercent,
+    'efficiencyRange',
+    lastLegal,
+    issues,
+  )
+  if (
+    capacity === null ||
+    usablePercent === null ||
+    selfDischarge === null ||
+    efficiencyPercent === null
+  ) {
     missing = true
   }
 
@@ -202,6 +232,10 @@ export function evaluateProfile(
         capacity_mAh: capacity!,
         usablePercent: usablePercent!,
         selfDischargePercentPerMonth: selfDischarge!,
+        efficiencyPercent: efficiencyPercent!,
+        chemistryId: state.battery.chemistryId,
+        cellId: state.battery.cellId,
+        efficiencyPresetId: state.battery.efficiencyPresetId,
       },
       phases,
       leakageCurrents,

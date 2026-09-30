@@ -13,10 +13,30 @@ export type FrequencyUnit =
   | 'everyWeek'
   | 'everyMonth'
 
+export type ChemistryId =
+  | 'li-socl2'
+  | 'li-mno2'
+  | 'li-fes2'
+  | 'alkaline'
+  | 'li-ion'
+  | 'lifepo4'
+  | 'nimh-lsd'
+
+/** null means the matching preset button is not selected. */
+export type EfficiencyPresetId = 'at-battery' | 'buck' | 'buck-boost'
+
 export interface BatteryConfig {
   capacity_mAh: number
   usablePercent: number
   selfDischargePercentPerMonth: number
+  /** Load-side phase charge is divided by this percent. 100 leaves phases unchanged. */
+  efficiencyPercent: number
+  /** null is Custom: the selects write nothing and the self-discharge slider uses the generic band. */
+  chemistryId: ChemistryId | null
+  /** null is Custom. A cell belongs to the selected chemistry. */
+  cellId: string | null
+  /** null means the percent was typed or dragged, even when it equals 80, 90, or 100. */
+  efficiencyPresetId: EfficiencyPresetId | null
 }
 
 export interface Phase {

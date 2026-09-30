@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { calculate } from '@/lib/calc'
+import { createExampleProfile } from '@/lib/exampleProfile'
 import type { BatteryConfig, Phase } from '@/types/calculator'
 
-const battery: BatteryConfig = {
-  capacity_mAh: 1000,
-  usablePercent: 80,
-  selfDischargePercentPerMonth: 0,
-}
+const battery: BatteryConfig = createExampleProfile().battery
 
 const phases: Phase[] = [
   {
@@ -80,6 +77,7 @@ describe('calculate leakage and self-discharge', () => {
   it('keeps a self-discharge contribution below 0.001 mAh/day', () => {
     const result = calculate(
       {
+        ...battery,
         capacity_mAh: 10,
         usablePercent: 100,
         selfDischargePercentPerMonth: 0.01,
@@ -276,6 +274,42 @@ describe('day budget', () => {
     expect(off.phaseResults.map((row) => row.phaseId)).toEqual(['sleep'])
     expect(off.phaseResults[0]!.mAhPerDay).toBe(0)
     expect(off.totalmAhPerDay).toBe(0)
+  })
+
+  it('scales phase charge by efficiency and leaves leakage unscaled', () => {
+    const load: Phase = {
+      id: 'load',
+      name: 'Load',
+      isDeepSleep: false,
+      current: 10,
+      currentUnit: 'mA',
+      duration: 1,
+      durationUnit: 'h',
+      frequency: 1,
+      frequencyUnit: 'perDay',
+    }
+    const sleep: Phase = {
+      id: 'sleep',
+      name: 'DeepSleep',
+      isDeepSleep: true,
+      current: 0,
+      currentUnit: 'mA',
+      duration: 0,
+      durationUnit: 's',
+      frequency: 0,
+      frequencyUnit: 'perHour',
+    }
+    const result = calculate(
+      { ...battery, efficiencyPercent: 80, efficiencyPresetId: 'buck-boost' },
+      [load, sleep],
+      [{ id: 'leak', label: 'probe', current: 1, currentUnit: 'mA' }],
+    )
+
+    const phase = result.phaseResults.find((row) => row.phaseId === 'load')
+    const leakage = result.phaseResults.find((row) => row.phaseId === 'leakage-currents-virtual')
+    expect(phase!.mAhPerDay).toBeCloseTo(12.5)
+    expect(leakage!.mAhPerDay).toBeCloseTo(24)
+    expect(result.totalmAhPerDay).toBeCloseTo(phase!.mAhPerDay + leakage!.mAhPerDay)
   })
 
   it('rejects a negative leakage current', () => {

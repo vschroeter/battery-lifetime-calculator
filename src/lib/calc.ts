@@ -132,6 +132,9 @@ export function calculate(
   if (!isLegal('selfDischargeRange', battery.selfDischargePercentPerMonth)) {
     errors.push('Self-discharge rate must be between 0 and 100 (exclusive)')
   }
+  if (!isLegal('efficiencyRange', battery.efficiencyPercent)) {
+    errors.push('Regulator efficiency must be greater than 0 and at most 100')
+  }
 
   const deepSleepPhases = phases.filter((phase) => phase.isDeepSleep)
   if (deepSleepPhases.length !== 1) {
@@ -164,6 +167,10 @@ export function calculate(
     return emptyResult(errors, warnings)
   }
 
+  // Phase currents are load-side. Efficiency scales them to the battery.
+  // Leakage and self-discharge are already battery-side and stay unscaled.
+  const phaseScale = 100 / battery.efficiencyPercent
+
   // Calculate phase results
   const phaseResults: PhaseResult[] = []
   let totalActiveTimeSeconds = 0
@@ -177,7 +184,7 @@ export function calculate(
       phaseResults.push({
         phaseId: phase.id,
         phaseName: phase.name,
-        mAhPerDay: result.mAhPerDay,
+        mAhPerDay: result.mAhPerDay * phaseScale,
         eventsPerDay: result.eventsPerDay,
         activeTimePerDaySeconds: result.activeTimePerDaySeconds,
       })
@@ -235,7 +242,7 @@ export function calculate(
   phaseResults.push({
     phaseId: deepSleepPhase.id,
     phaseName: deepSleepPhase.name,
-    mAhPerDay: deepSleepCurrent_mA * (deepSleepTimeSeconds / 3600),
+    mAhPerDay: deepSleepCurrent_mA * (deepSleepTimeSeconds / 3600) * phaseScale,
     eventsPerDay: 0,
     activeTimePerDaySeconds: deepSleepTimeSeconds,
   })

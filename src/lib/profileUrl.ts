@@ -1,4 +1,14 @@
 import { decode, encode } from '@msgpack/msgpack'
+import {
+  decodeCell,
+  decodeChemistry,
+  decodeEfficiencyPreset,
+  efficiencyPresetById,
+  encodeCell,
+  encodeChemistry,
+  encodeEfficiencyPreset,
+  isLegacyBatteryEncoding,
+} from '@/lib/batteryPresets'
 import { FREQUENCY_UNITS } from '@/lib/units'
 import { ConfigImportError, importConfigFromJSON, type ImportNotice } from '@/lib/import'
 import type {
@@ -12,7 +22,12 @@ import type {
 } from '@/types/calculator'
 
 const HASH_KEY = 'cfg='
-/** Layout version for the link. Independent of the JSON file version. */
+/**
+ * Layout version for the link. Independent of the JSON file version.
+ * Schema 1 still accepts the original 3-number battery. That short form is
+ * 100% efficiency, Custom chemistry, and the “already at the battery” preset.
+ * Any other preset state is a 7-number battery on the same schema.
+ */
 const HASH_SCHEMA = 1
 
 const CURRENT_UNITS = ['nA', 'µA', 'mA', 'A'] as const satisfies readonly CurrentUnit[]
@@ -79,11 +94,7 @@ export function decodeProfileToken(token: string): DecodedProfile {
 function toPositional(state: CalculatorState): unknown[] {
   const positional: unknown[] = [
     HASH_SCHEMA,
-    [
-      state.battery.capacity_mAh,
-      state.battery.usablePercent,
-      state.battery.selfDischargePercentPerMonth,
-    ],
+    batteryPositional(state.battery),
     state.phases.map((phase) => {
       const head: unknown[] = [
         phase.name,
@@ -126,7 +137,12 @@ function expandPositional(value: unknown): CalculatorState {
   if (schema !== HASH_SCHEMA) {
     throw new ConfigImportError('importUnsupportedVersion')
   }
-  if (!Array.isArray(battery) || battery.length !== 3 || !Array.isArray(phases) || !Array.isArray(leakages)) {
+  if (
+    !Array.isArray(battery) ||
+    (battery.length !== 3 && battery.length !== 7) ||
+    !Array.isArray(phases) ||
+    !Array.isArray(leakages)
+  ) {
     throw new ConfigImportError('importInvalidJson')
   }
 
@@ -140,7 +156,12 @@ function expandPositional(value: unknown): CalculatorState {
   }
 
   return {
-    battery: { capacity_mAh, usablePercent, selfDischargePercentPerMonth },
+    battery: expandBattery(
+      capacity_mAh,
+      usablePercent,
+      selfDischargePercentPerMonth,
+      battery,
+    ),
     phases: phases.map((row, index) => expandPhase(row, index)),
     leakageCurrents: leakages.map((row, index) => expandLeakage(row, index)),
     leakageEnabled: value.length === 5 ? value[4] !== 0 : true,
@@ -277,11 +298,88 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
 }
 
+function batteryPositional(battery: BatteryConfig): number[] {
+  const head = [
+    battery.capacity_mAh,
+    battery.usablePercent,
+    battery.selfDischargePercentPerMonth,
+  ]
+  if (isLegacyBatteryEncoding(battery)) {
+    return head
+  }
+  return [
+    ...head,
+    battery.efficiencyPercent,
+    encodeChemistry(battery.chemistryId),
+    encodeCell(battery.chemistryId, battery.cellId),
+    encodeEfficiencyPreset(battery.efficiencyPresetId),
+  ]
+}
+
+function expandBattery(
+  capacity_mAh: number,
+  usablePercent: number,
+  selfDischargePercentPerMonth: number,
+  battery: unknown[],
+): BatteryConfig {
+  if (battery.length === 3) {
+    return {
+      capacity_mAh,
+      usablePercent,
+      selfDischargePercentPerMonth,
+      efficiencyPercent: 100,
+      chemistryId: null,
+      cellId: null,
+      efficiencyPresetId: 'at-battery',
+    }
+  }
+
+  const efficiencyPercent = battery[3]
+  const chemistryCode = battery[4]
+  const cellCode = battery[5]
+  const presetCode = battery[6]
+  if (
+    !isFiniteNumber(efficiencyPercent) ||
+    typeof chemistryCode !== 'number' ||
+    typeof cellCode !== 'number' ||
+    typeof presetCode !== 'number'
+  ) {
+    throw new ConfigImportError('importInvalidBatteryNumbers')
+  }
+
+  const chemistryId = decodeChemistry(chemistryCode)
+  const cellId = chemistryId === undefined ? undefined : decodeCell(chemistryId, cellCode)
+  let efficiencyPresetId = decodeEfficiencyPreset(presetCode)
+  if (chemistryId === undefined || cellId === undefined || efficiencyPresetId === undefined) {
+    throw new ConfigImportError('importInvalidBattery')
+  }
+  if (
+    efficiencyPresetId !== null &&
+    efficiencyPresetById(efficiencyPresetId).percent !== efficiencyPercent
+  ) {
+    efficiencyPresetId = null
+  }
+
+  return {
+    capacity_mAh,
+    usablePercent,
+    selfDischargePercentPerMonth,
+    efficiencyPercent,
+    chemistryId,
+    cellId,
+    efficiencyPresetId,
+  }
+}
+
 function batteryEqual(left: BatteryConfig, right: BatteryConfig): boolean {
   return (
     left.capacity_mAh === right.capacity_mAh &&
     left.usablePercent === right.usablePercent &&
-    left.selfDischargePercentPerMonth === right.selfDischargePercentPerMonth
+    left.selfDischargePercentPerMonth === right.selfDischargePercentPerMonth &&
+    left.efficiencyPercent === right.efficiencyPercent &&
+    left.chemistryId === right.chemistryId &&
+    left.cellId === right.cellId &&
+    left.efficiencyPresetId === right.efficiencyPresetId
   )
 }
 

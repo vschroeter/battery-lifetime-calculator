@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { calculate } from '@/lib/calc'
+import { createExampleProfile } from '@/lib/exampleProfile'
 import {
   formatActiveTime,
   formatChargePerDay,
@@ -9,11 +10,7 @@ import {
 } from '@/lib/format'
 import type { BatteryConfig, Phase } from '@/types/calculator'
 
-const defaultBattery: BatteryConfig = {
-  capacity_mAh: 1000,
-  usablePercent: 80,
-  selfDischargePercentPerMonth: 0,
-}
+const defaultBattery: BatteryConfig = createExampleProfile().battery
 
 const defaultPhases: Phase[] = [
   {

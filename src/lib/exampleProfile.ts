@@ -7,6 +7,10 @@ export function createExampleProfile(): CalculatorState {
       capacity_mAh: 1000,
       usablePercent: 80,
       selfDischargePercentPerMonth: 0,
+      efficiencyPercent: 100,
+      chemistryId: null,
+      cellId: null,
+      efficiencyPresetId: 'at-battery',
     },
     phases: [
       {

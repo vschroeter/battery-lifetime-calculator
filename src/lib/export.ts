@@ -17,6 +17,11 @@ export interface CsvLabels {
   capacity: string
   usableCapacity: string
   selfDischarge: string
+  efficiency: string
+  chemistry: string
+  cell: string
+  chemistryValue: string
+  cellValue: string
   averageCurrent: string
   consumptionPerDay: string
   runtime: string
@@ -170,6 +175,21 @@ export function buildResultsCsv(
     labels.selfDischarge,
     String(battery.selfDischargePercentPerMonth),
     labels.unitPercentPerMonth,
+  ], textFirstColumn))
+  rows.push(csvRow([
+    labels.efficiency,
+    String(battery.efficiencyPercent),
+    labels.unitPercent,
+  ], textFirstColumn))
+  rows.push(csvRow([
+    labels.chemistry,
+    labels.chemistryValue,
+    '',
+  ], textFirstColumn))
+  rows.push(csvRow([
+    labels.cell,
+    labels.cellValue,
+    '',
   ], textFirstColumn))
   rows.push(csvRow([
     labels.averageCurrent,

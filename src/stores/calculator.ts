@@ -12,11 +12,20 @@ import {
   rememberPhase,
   type FieldIssue,
 } from '@/lib/fields'
+import {
+  commitCapacity,
+  commitEfficiency,
+  withCell,
+  withChemistry,
+  withEfficiencyPreset,
+} from '@/lib/batteryPresets'
 import { createExampleProfile } from '@/lib/exampleProfile'
 import { LEAKAGE_PHASE_ID } from '@/lib/leakage'
 import { duplicatePhaseName, insertAfterPhase, placeActivePhase } from '@/lib/phaseList'
 import type {
   BatteryConfig,
+  ChemistryId,
+  EfficiencyPresetId,
   Phase,
   CalculatorState,
   LeakageCurrent,
@@ -89,11 +98,58 @@ export const useCalculatorStore = defineStore('calculator', () => {
   }
 
   function commitBatteryField(
-    field: 'capacity_mAh' | 'usablePercent' | 'selfDischargePercentPerMonth',
+    field: 'capacity_mAh' | 'usablePercent' | 'selfDischargePercentPerMonth' | 'efficiencyPercent',
     value: number,
   ) {
-    battery.value = { ...battery.value, [field]: value }
+    if (field === 'capacity_mAh') {
+      battery.value = commitCapacity(battery.value, value)
+    } else if (field === 'efficiencyPercent') {
+      battery.value = commitEfficiency(battery.value, value)
+    } else {
+      battery.value = { ...battery.value, [field]: value }
+    }
     rememberCommitted(batteryFieldKey(field), batteryFieldRule(field), value)
+  }
+
+  function applyChemistry(chemistryId: ChemistryId | null) {
+    if (chemistryId === battery.value.chemistryId) {
+      return
+    }
+    battery.value = withChemistry(battery.value, chemistryId)
+    rememberCommitted(
+      batteryFieldKey('usablePercent'),
+      batteryFieldRule('usablePercent'),
+      battery.value.usablePercent,
+    )
+    rememberCommitted(
+      batteryFieldKey('selfDischargePercentPerMonth'),
+      batteryFieldRule('selfDischargePercentPerMonth'),
+      battery.value.selfDischargePercentPerMonth,
+    )
+  }
+
+  function applyCell(cellId: string | null) {
+    if (cellId === battery.value.cellId) {
+      return
+    }
+    const next = withCell(battery.value, cellId)
+    battery.value = next
+    if (cellId !== null) {
+      rememberCommitted(
+        batteryFieldKey('capacity_mAh'),
+        batteryFieldRule('capacity_mAh'),
+        next.capacity_mAh,
+      )
+    }
+  }
+
+  function applyEfficiencyPreset(presetId: EfficiencyPresetId) {
+    battery.value = withEfficiencyPreset(battery.value, presetId)
+    rememberCommitted(
+      batteryFieldKey('efficiencyPercent'),
+      batteryFieldRule('efficiencyPercent'),
+      battery.value.efficiencyPercent,
+    )
   }
 
   function addPhase(phase: Omit<Phase, 'id'>): string {
@@ -286,6 +342,7 @@ export const useCalculatorStore = defineStore('calculator', () => {
     if (key === batteryFieldKey('selfDischargePercentPerMonth')) {
       return battery.value.selfDischargePercentPerMonth
     }
+    if (key === batteryFieldKey('efficiencyPercent')) return battery.value.efficiencyPercent
     for (const phase of phases.value) {
       if (key === phaseFieldKey(phase.id, 'current')) return phase.current
       if (key === phaseFieldKey(phase.id, 'duration')) return phase.duration
@@ -317,6 +374,9 @@ export const useCalculatorStore = defineStore('calculator', () => {
     resolvedNumber,
     updateBattery,
     commitBatteryField,
+    applyChemistry,
+    applyCell,
+    applyEfficiencyPreset,
     addPhase,
     duplicatePhase,
     moveActivePhase,
