@@ -42,6 +42,7 @@ export const useCalculatorStore = defineStore('calculator', () => {
   const highlightedPhaseId = computed(() => hoveredPhaseId.value ?? pinnedPhaseId.value)
 
   const leakageCurrents = ref<LeakageCurrent[]>([])
+  const leakageEnabled = ref(example.leakageEnabled !== false)
   const lastLegal = ref<Record<string, number>>({})
 
   // Getters
@@ -49,6 +50,7 @@ export const useCalculatorStore = defineStore('calculator', () => {
     battery: battery.value,
     phases: phases.value,
     leakageCurrents: leakageCurrents.value,
+    leakageEnabled: leakageEnabled.value,
   }))
 
   const presentation = computed<Presentation>(() => {
@@ -60,6 +62,7 @@ export const useCalculatorStore = defineStore('calculator', () => {
       evaluated.model.battery,
       evaluated.model.phases,
       evaluated.model.leakageCurrents,
+      leakageEnabled.value,
     )
     if (result.errors.length > 0) {
       return { issues: evaluated.issues, withheld: true, result: null }
@@ -172,6 +175,7 @@ export const useCalculatorStore = defineStore('calculator', () => {
     battery.value = next.battery
     phases.value = next.phases
     leakageCurrents.value = next.leakageCurrents
+    leakageEnabled.value = next.leakageEnabled !== false
     hoveredPhaseId.value = null
     pinnedPhaseId.value = null
     lastLegal.value = legalSnapshot(state.value)
@@ -182,6 +186,7 @@ export const useCalculatorStore = defineStore('calculator', () => {
     battery.value = { ...nextState.battery }
     phases.value = nextState.phases.map((phase) => ({ ...phase }))
     leakageCurrents.value = nextState.leakageCurrents.map((leakage) => ({ ...leakage }))
+    leakageEnabled.value = nextState.leakageEnabled !== false
     hoveredPhaseId.value = null
     pinnedPhaseId.value = null
     lastLegal.value = legalSnapshot(state.value)
@@ -292,11 +297,16 @@ export const useCalculatorStore = defineStore('calculator', () => {
     return null
   }
 
+  function setLeakageEnabled(enabled: boolean) {
+    leakageEnabled.value = enabled
+  }
+
   lastLegal.value = legalSnapshot(state.value)
 
   return {
     battery,
     phases,
+    leakageEnabled,
     hoveredPhaseId,
     pinnedPhaseId,
     highlightedPhaseId,
@@ -323,6 +333,7 @@ export const useCalculatorStore = defineStore('calculator', () => {
     commitLeakageCurrent,
     removeLeakageCurrent,
     removeAllLeakageCurrents,
+    setLeakageEnabled,
   }
 })
 

@@ -7,9 +7,17 @@ import LeakageCurrentsPanel from '@/components/LeakageCurrentsPanel.vue'
 import NumericField from '@/components/NumericField.vue'
 import PhaseNameField from '@/components/PhaseNameField.vue'
 import { useFieldMessage } from '@/composables/useFieldMessage'
+import {
+  closedUnitWord,
+  dutyMenuUnits,
+  formatDutySentence,
+  menuUnitWord,
+  swappedDuty,
+} from '@/lib/duty'
 import { phaseFieldKey } from '@/lib/fields'
 import { smallestFreePhaseName } from '@/lib/phaseList'
-import type { Phase, CurrentUnit, DurationUnit } from '@/types/calculator'
+import { isIntervalUnit } from '@/lib/units'
+import type { Phase, CurrentUnit, DurationUnit, FrequencyUnit } from '@/types/calculator'
 
 const store = useCalculatorStore()
 const { i18n } = useLocale()
@@ -153,7 +161,7 @@ function addPhase() {
     duration: 1,
     durationUnit: 's',
     frequency: 1,
-    frequencyUnit: 'perHour',
+    frequencyUnit: 'everyHour',
   })
   void scrollPhaseIntoView(id)
 }
@@ -180,16 +188,58 @@ function updatePhase(id: string, updates: Partial<Phase>) {
   store.updatePhase(id, updates)
 }
 
+function dutyItems(unit: FrequencyUnit) {
+  return dutyMenuUnits(unit).map((value) => ({
+    value,
+    title: menuUnitWord(value, i18n.locale.value),
+  }))
+}
+
+function closedDutyUnit(phase: Phase): string {
+  return closedUnitWord(phase.frequencyUnit, phase.frequency, i18n.locale.value)
+}
+
+function otherDutyLabel(phase: Phase): string | null {
+  const next = swappedDuty(phase.frequency, phase.frequencyUnit)
+  if (!next) {
+    return null
+  }
+  return formatDutySentence(next.frequency, next.frequencyUnit, i18n.locale.value)
+}
+
+function swapPhaseDuty(phase: Phase) {
+  const next = swappedDuty(phase.frequency, phase.frequencyUnit)
+  if (!next) {
+    return
+  }
+  updatePhase(phase.id, next)
+}
+
+function onDutyUnit(phase: Phase, unit: FrequencyUnit | null) {
+  if (!unit || !dutyMenuUnits(phase.frequencyUnit).includes(unit)) {
+    return
+  }
+  updatePhase(phase.id, { frequencyUnit: unit })
+}
+
+function onDutyMode(phase: Phase, mode: 'rate' | 'interval' | null) {
+  if (!mode) {
+    return
+  }
+  const interval = isIntervalUnit(phase.frequencyUnit)
+  if ((mode === 'interval') === interval) {
+    return
+  }
+  swapPhaseDuty(phase)
+}
+
+function setPhaseEnabled(phase: Phase, enabled: boolean | null) {
+  updatePhase(phase.id, { enabled: enabled === true })
+}
+
 async function scrollPhaseIntoView(id: string) {
   await nextTick()
   document.getElementById(`phase-card-${id}`)?.scrollIntoView({ block: 'nearest' })
-}
-
-function onPhaseClick(id: string, event: MouseEvent) {
-  if (event.detail > 1) {
-    return
-  }
-  store.togglePinnedPhase(id)
 }
 
 function desiredActiveIndex(id: string, clientY: number): number | null {
@@ -369,20 +419,34 @@ function isHighlighted(id: string): boolean {
         v-for="phase in deepSleepPhases"
         :key="phase.id"
         class="phase-card modern-card"
-        :class="{ 'phase-card-highlighted': isHighlighted(phase.id) }"
+        :class="{
+          'phase-card-highlighted': isHighlighted(phase.id),
+          'phase-card-off': phase.enabled === false,
+        }"
         elevation="1"
         @mouseenter="store.setHoveredPhase(phase.id)"
         @mouseleave="store.setHoveredPhase(null)"
-        @click="onPhaseClick(phase.id, $event)"
       >
-        <v-card-title class="d-flex align-center pa-3 pb-2 ga-2">
+        <v-card-title class="phase-heading d-flex align-center pa-3 pb-2 ga-2">
+          <v-switch
+            :model-value="phase.enabled !== false"
+            color="success"
+            density="compact"
+            hide-details
+            inset
+            class="phase-enable"
+            :aria-label="i18n.t('includeInCalculation')"
+            @click.stop
+            @update:model-value="setPhaseEnabled(phase, $event)"
+          />
+          <div class="heading-divider" aria-hidden="true" />
           <div
             class="phase-color-indicator"
             :style="{ backgroundColor: getPhaseColor(phase) }"
           />
           <PhaseNameField :phase-id="phase.id" :name="phase.name" />
         </v-card-title>
-        <v-card-text class="pa-3 pt-2">
+        <v-card-text class="pa-3 pt-2" :class="{ 'phase-body-off': phase.enabled === false }">
           <div class="d-flex flex-column ga-2">
             <div class="d-flex ga-2 align-center">
               <NumericField
@@ -432,14 +496,14 @@ function isHighlighted(id: string): boolean {
         :class="{
           'phase-card-highlighted': isHighlighted(phase.id),
           'phase-card-dragging': draggingPhaseId === phase.id,
+          'phase-card-off': phase.enabled === false,
         }"
         elevation="1"
         @mouseenter="store.setHoveredPhase(phase.id)"
         @mouseleave="store.setHoveredPhase(null)"
-        @click="onPhaseClick(phase.id, $event)"
       >
-        <v-card-title class="d-flex align-center pa-3 pb-2 ga-1">
-          <v-tooltip location="top" :disabled="draggingPhaseId !== null">
+        <v-card-title class="phase-heading d-flex align-center pa-3 pb-2 ga-1">
+          <v-tooltip location="top" open-delay="500" :disabled="draggingPhaseId !== null">
             <template #activator="{ props: tooltipProps }">
               <v-btn
                 v-bind="tooltipProps"
@@ -457,6 +521,18 @@ function isHighlighted(id: string): boolean {
             </template>
             <span>{{ i18n.t('reorderPhase') }}</span>
           </v-tooltip>
+          <v-switch
+            :model-value="phase.enabled !== false"
+            color="success"
+            density="compact"
+            hide-details
+            inset
+            class="phase-enable"
+            :aria-label="i18n.t('includeInCalculation')"
+            @click.stop
+            @update:model-value="setPhaseEnabled(phase, $event)"
+          />
+          <div class="heading-divider" aria-hidden="true" />
           <div
             class="phase-color-indicator"
             :style="{ backgroundColor: getPhaseColor(phase) }"
@@ -477,6 +553,7 @@ function isHighlighted(id: string): boolean {
             </template>
             <span>{{ i18n.t('duplicatePhase') }}</span>
           </v-tooltip>
+          <div class="phase-action-divider" aria-hidden="true" />
           <v-btn
             icon="mdi-delete"
             variant="text"
@@ -487,16 +564,17 @@ function isHighlighted(id: string): boolean {
             @click.stop="removePhase(phase.id)"
           />
         </v-card-title>
-        <v-card-text class="pa-3 pt-2">
-          <div class="d-flex flex-column ga-2">
-            <!-- Current + Unit -->
-            <div class="d-flex ga-2 flex-wrap align-center">
+        <v-card-text class="pa-3 pt-2" :class="{ 'phase-body-off': phase.enabled === false }">
+          <div class="d-flex flex-column ga-4">
+            <div class="measure-row">
+              <div class="measure-copy">
+                <div class="measure-title">{{ i18n.t('current') }}</div>
+                <div class="measure-hint">{{ i18n.t('currentHint') }}</div>
+              </div>
               <NumericField
                 :model-value="phase.current"
-                :label="i18n.t('current')"
                 :error-message="message(phaseFieldKey(phase.id, 'current'))"
-                class="flex-grow-1"
-                style="min-width: 150px"
+                class="measure-value"
                 @commit="store.commitPhaseField(phase.id, 'current', $event)"
               />
               <v-btn-toggle
@@ -516,14 +594,15 @@ function isHighlighted(id: string): boolean {
               </v-btn-toggle>
             </div>
 
-            <!-- Duration + Unit -->
-            <div class="d-flex ga-2 flex-wrap align-center">
+            <div class="measure-row">
+              <div class="measure-copy">
+                <div class="measure-title">{{ i18n.t('duration') }}</div>
+                <div class="measure-hint">{{ i18n.t('durationHint') }}</div>
+              </div>
               <NumericField
                 :model-value="phase.duration"
-                :label="i18n.t('duration')"
                 :error-message="message(phaseFieldKey(phase.id, 'duration'))"
-                class="flex-grow-1"
-                style="min-width: 150px"
+                class="measure-value"
                 @commit="store.commitPhaseField(phase.id, 'duration', $event)"
               />
               <v-btn-toggle
@@ -546,33 +625,62 @@ function isHighlighted(id: string): boolean {
               </v-btn-toggle>
             </div>
 
-            <!-- Frequency + Unit -->
-            <div class="d-flex ga-2 flex-wrap align-center">
-              <NumericField
-                :model-value="phase.frequency"
-                :label="i18n.t('frequency')"
-                :error-message="message(phaseFieldKey(phase.id, 'frequency'))"
-                class="flex-grow-1"
-                style="min-width: 150px"
-                @commit="store.commitPhaseField(phase.id, 'frequency', $event)"
-              />
-              <v-btn-toggle
-                :model-value="phase.frequencyUnit"
-                variant="outlined"
-                density="compact"
-                mandatory
-                divided
-                class="unit-toggle"
-                @update:model-value="
-                  updatePhase(phase.id, {
-                    frequencyUnit: $event,
-                  })
-                "
-              >
-                <v-btn value="perHour" size="small">{{ i18n.t('perHour') }}</v-btn>
-                <v-btn value="perDay" size="small">{{ i18n.t('perDay') }}</v-btn>
-                <v-btn value="perWeek" size="small">{{ i18n.t('perWeek') }}</v-btn>
-              </v-btn-toggle>
+            <div class="interval-box">
+              <div class="interval-head">
+                <div class="measure-copy">
+                  <div class="measure-title">{{ i18n.t('intervalConfiguration') }}</div>
+                  <div class="measure-hint">{{ i18n.t('intervalConfigurationHint') }}</div>
+                </div>
+                <v-btn-toggle
+                  :model-value="isIntervalUnit(phase.frequencyUnit) ? 'interval' : 'rate'"
+                  variant="outlined"
+                  density="compact"
+                  mandatory
+                  divided
+                  class="mode-toggle"
+                  @update:model-value="onDutyMode(phase, $event as 'rate' | 'interval' | null)"
+                >
+                  <v-btn value="rate" size="small">{{ i18n.t('dutyRateMode') }}</v-btn>
+                  <v-btn value="interval" size="small">{{ i18n.t('dutyIntervalMode') }}</v-btn>
+                </v-btn-toggle>
+              </div>
+              <div class="interval-sentence">
+                <span v-if="isIntervalUnit(phase.frequencyUnit)" class="once-every">
+                  {{ i18n.t('onceEvery') }}
+                </span>
+                <NumericField
+                  :model-value="phase.frequency"
+                  :aria-label="isIntervalUnit(phase.frequencyUnit) ? i18n.t('interval') : i18n.t('frequency')"
+                  :error-message="message(phaseFieldKey(phase.id, 'frequency'))"
+                  class="measure-value"
+                  @commit="store.commitPhaseField(phase.id, 'frequency', $event)"
+                />
+                <v-select
+                  :model-value="phase.frequencyUnit"
+                  :items="dutyItems(phase.frequencyUnit)"
+                  item-title="title"
+                  item-value="value"
+                  :aria-label="i18n.t('dutyUnit')"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  class="duty-unit"
+                  @update:model-value="onDutyUnit(phase, $event)"
+                >
+                  <template #selection>
+                    {{ closedDutyUnit(phase) }}
+                  </template>
+                </v-select>
+                <button
+                  v-if="otherDutyLabel(phase)"
+                  type="button"
+                  class="duty-equation"
+                  @click="swapPhaseDuty(phase)"
+                >
+                  <span aria-hidden="true">=</span>
+                  {{ otherDutyLabel(phase) }}
+                </button>
+              </div>
             </div>
           </div>
         </v-card-text>
@@ -667,6 +775,176 @@ function isHighlighted(id: string): boolean {
   border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
+.heading-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 6px 0 2px;
+  background: rgba(15, 23, 42, 0.16);
+  flex: 0 0 auto;
+}
+
+.phase-heading {
+  min-height: 48px;
+}
+
+.phase-action-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 2px;
+  background: rgba(15, 23, 42, 0.15);
+  flex: 0 0 auto;
+}
+
+.phase-enable {
+  flex: 0 0 auto;
+  transform: scale(0.8);
+  transform-origin: left center;
+}
+
+.phase-enable :deep(.v-selection-control) {
+  min-height: 22px;
+}
+
+.phase-enable :deep(.v-switch__track) {
+  opacity: 1;
+}
+
+.phase-body-off {
+  opacity: 0.48;
+}
+
+.measure-row {
+  display: grid;
+  grid-template-columns: minmax(9.5rem, 12rem) minmax(6.5rem, 9rem) minmax(12rem, 1fr);
+  gap: 12px 16px;
+  align-items: center;
+}
+
+.measure-copy {
+  min-width: 0;
+}
+
+.measure-title {
+  font-weight: 650;
+  font-size: 0.95rem;
+  line-height: 1.2;
+  color: rgb(15, 23, 42);
+}
+
+.measure-hint {
+  margin-top: 2px;
+  font-size: 0.8rem;
+  line-height: 1.3;
+  color: rgba(15, 23, 42, 0.55);
+}
+
+.measure-value {
+  min-width: 0;
+}
+
+.interval-box {
+  padding: 14px;
+  border-radius: 14px;
+  background: #f4f7fb;
+}
+
+.interval-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.interval-sentence {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.interval-sentence .measure-value {
+  flex: 1 1 5.5rem;
+  max-width: 7rem;
+}
+
+.interval-sentence .duty-unit {
+  flex: 1 1 6.5rem;
+  min-width: 5.5rem;
+  max-width: 8rem;
+}
+
+.once-every {
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.duty-equation {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  padding: 4px 8px 4px 10px;
+  border: 0;
+  border-left: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 0;
+  background: transparent;
+  color: rgb(15, 23, 42);
+  font: inherit;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.duty-equation:hover {
+  color: rgb(var(--v-theme-primary));
+}
+
+.mode-toggle {
+  flex: 0 1 auto;
+  height: auto;
+}
+
+.mode-toggle :deep(.v-btn) {
+  text-transform: none;
+  letter-spacing: normal;
+  min-height: 36px;
+}
+
+.mode-toggle :deep(.v-btn--active) {
+  background: #e8f1ff !important;
+  color: #1d4ed8 !important;
+  border-color: #93c5fd !important;
+}
+
+.unit-toggle :deep(.v-btn--active) {
+  background: #dbeafe !important;
+  color: #1e3a5f !important;
+}
+
+@media (max-width: 720px) {
+  .measure-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .interval-sentence {
+    flex-wrap: wrap;
+  }
+
+  .duty-equation {
+    margin-left: 0;
+    border-left: 0;
+    padding-left: 0;
+  }
+}
+
 .add-phase-fab {
   border-radius: 50% !important;
   width: 56px;
@@ -697,6 +975,18 @@ function isHighlighted(id: string): boolean {
 
 .unit-toggle :deep(.v-btn) {
   flex: 1 1 0;
+  min-width: 0;
+}
+
+.duty-unit {
+  flex: 0 1 11rem;
+  min-width: 9rem;
+  max-width: 100%;
+}
+
+.duty-swap {
+  text-transform: none;
+  letter-spacing: normal;
   min-width: 0;
 }
 

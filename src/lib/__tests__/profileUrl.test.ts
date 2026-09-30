@@ -60,6 +60,17 @@ describe('profile URL', () => {
     expect(encodeProfileHash(decoded.state)).toBe(hash)
   })
 
+  it('round-trips a month rate and a minute interval', () => {
+    const state = createExampleProfile()
+    state.phases[0] = { ...state.phases[0]!, frequency: 2, frequencyUnit: 'perMonth' }
+    const decoded = decodeProfileToken(profileTokenFromHash(encodeProfileHash(state))!)
+    expect(decoded.state.phases[0]).toMatchObject({ frequency: 2, frequencyUnit: 'perMonth' })
+
+    state.phases[0] = { ...state.phases[0]!, frequency: 10, frequencyUnit: 'everyMinute' }
+    const again = decodeProfileToken(profileTokenFromHash(encodeProfileHash(state))!)
+    expect(again.state.phases[0]).toMatchObject({ frequency: 10, frequencyUnit: 'everyMinute' })
+  })
+
   it('encodes the example profile far below the compact JSON token', () => {
     const state = createExampleProfile()
     const json = JSON.stringify(JSON.parse(serializeConfig(state)))

@@ -202,7 +202,6 @@ function renderChart() {
     .attr('stroke-width', 1)
     .attr('class', (d) => `arc-path arc-${d.data.phaseId}`)
     .attr('data-phase-id', (d) => d.data.phaseId)
-    .style('cursor', 'pointer')
     .style('transition', 'opacity 0.2s ease')
     .style('opacity', (d) => shareOpaque(d.data.phaseId))
     .on('mouseenter', function (_event, d) {
@@ -210,9 +209,6 @@ function renderChart() {
     })
     .on('mouseleave', function () {
       store.setHoveredPhase(null)
-    })
-    .on('click', function (_event, d) {
-      store.togglePinnedPhase(d.data.phaseId)
     })
 }
 
@@ -290,7 +286,6 @@ const segments = computed(() => {
             :style="{ opacity: shareOpaque(seg.phaseId) }"
             @mouseenter="store.setHoveredPhase(seg.phaseId)"
             @mouseleave="store.setHoveredPhase(null)"
-            @click="store.togglePinnedPhase(seg.phaseId)"
           >
             <div
               class="legend-color"
@@ -341,7 +336,7 @@ const segments = computed(() => {
 }
 
 .legend-entry {
-  cursor: pointer;
+  cursor: default;
   transition: opacity 0.2s ease;
   padding: 2px 4px;
   border-radius: 4px;

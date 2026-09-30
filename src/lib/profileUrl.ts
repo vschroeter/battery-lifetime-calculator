@@ -1,4 +1,5 @@
 import { decode, encode } from '@msgpack/msgpack'
+import { FREQUENCY_UNITS } from '@/lib/units'
 import { ConfigImportError, importConfigFromJSON, type ImportNotice } from '@/lib/import'
 import type {
   BatteryConfig,
@@ -16,8 +17,6 @@ const HASH_SCHEMA = 1
 
 const CURRENT_UNITS = ['nA', 'µA', 'mA', 'A'] as const satisfies readonly CurrentUnit[]
 const DURATION_UNITS = ['ms', 's', 'min', 'h'] as const satisfies readonly DurationUnit[]
-const FREQUENCY_UNITS = ['perHour', 'perDay', 'perWeek'] as const satisfies readonly FrequencyUnit[]
-
 const SLEEP_DURATION = 0
 const SLEEP_DURATION_UNIT: DurationUnit = 's'
 const SLEEP_FREQUENCY = 0
@@ -38,7 +37,8 @@ export function profilesEqual(left: CalculatorState, right: CalculatorState): bo
     left.leakageCurrents.length === right.leakageCurrents.length &&
     left.leakageCurrents.every((leakage, index) =>
       leakageEqual(leakage, right.leakageCurrents[index]!),
-    )
+    ) &&
+    (left.leakageEnabled !== false) === (right.leakageEnabled !== false)
   )
 }
 
@@ -77,7 +77,7 @@ export function decodeProfileToken(token: string): DecodedProfile {
 }
 
 function toPositional(state: CalculatorState): unknown[] {
-  return [
+  const positional: unknown[] = [
     HASH_SCHEMA,
     [
       state.battery.capacity_mAh,
@@ -91,16 +91,19 @@ function toPositional(state: CalculatorState): unknown[] {
         phase.current,
         unitCode(CURRENT_UNITS, phase.currentUnit),
       ]
-      if (phase.isDeepSleep) {
-        return head
+      const row = phase.isDeepSleep
+        ? head
+        : [
+            ...head,
+            phase.duration,
+            unitCode(DURATION_UNITS, phase.durationUnit),
+            phase.frequency,
+            unitCode(FREQUENCY_UNITS, phase.frequencyUnit),
+          ]
+      if (phase.enabled === false) {
+        row.push(0)
       }
-      return [
-        ...head,
-        phase.duration,
-        unitCode(DURATION_UNITS, phase.durationUnit),
-        phase.frequency,
-        unitCode(FREQUENCY_UNITS, phase.frequencyUnit),
-      ]
+      return row
     }),
     state.leakageCurrents.map((leakage) => [
       leakage.label,
@@ -108,10 +111,14 @@ function toPositional(state: CalculatorState): unknown[] {
       unitCode(CURRENT_UNITS, leakage.currentUnit),
     ]),
   ]
+  if (state.leakageEnabled === false) {
+    positional.push(0)
+  }
+  return positional
 }
 
 function expandPositional(value: unknown): CalculatorState {
-  if (!Array.isArray(value) || value.length !== 4) {
+  if (!Array.isArray(value) || (value.length !== 4 && value.length !== 5)) {
     throw new ConfigImportError('importInvalidJson')
   }
 
@@ -136,11 +143,12 @@ function expandPositional(value: unknown): CalculatorState {
     battery: { capacity_mAh, usablePercent, selfDischargePercentPerMonth },
     phases: phases.map((row, index) => expandPhase(row, index)),
     leakageCurrents: leakages.map((row, index) => expandLeakage(row, index)),
+    leakageEnabled: value.length === 5 ? value[4] !== 0 : true,
   }
 }
 
 function expandPhase(row: unknown, index: number): Phase {
-  if (!Array.isArray(row) || (row.length !== 4 && row.length !== 8)) {
+  if (!Array.isArray(row) || ![4, 5, 8, 9].includes(row.length)) {
     throw new ConfigImportError('importInvalidPhase', { index: String(index + 1) })
   }
 
@@ -151,7 +159,7 @@ function expandPhase(row: unknown, index: number): Phase {
   }
 
   const currentUnit = unitAt(CURRENT_UNITS, currentUnitCode, index, 'importInvalidPhaseValues')
-  if (isDeepSleep && row.length === 4) {
+  if (isDeepSleep && (row.length === 4 || row.length === 5)) {
     return {
       id: `phase-${index}`,
       name,
@@ -162,10 +170,11 @@ function expandPhase(row: unknown, index: number): Phase {
       durationUnit: SLEEP_DURATION_UNIT,
       frequency: SLEEP_FREQUENCY,
       frequencyUnit: SLEEP_FREQUENCY_UNIT,
+      enabled: row.length === 5 ? row[4] !== 0 : true,
     }
   }
 
-  if (row.length !== 8) {
+  if (row.length !== 8 && row.length !== 9) {
     throw new ConfigImportError('importInvalidPhase', { index: String(index + 1) })
   }
 
@@ -188,6 +197,7 @@ function expandPhase(row: unknown, index: number): Phase {
     frequencyUnit: isDeepSleep
       ? SLEEP_FREQUENCY_UNIT
       : unitAt(FREQUENCY_UNITS, frequencyUnitCode, index, 'importInvalidPhaseValues'),
+    enabled: row.length === 9 ? row[8] !== 0 : true,
   }
 }
 
@@ -285,7 +295,8 @@ function phaseEqual(left: Phase, right: Phase): boolean {
     left.duration === right.duration &&
     left.durationUnit === right.durationUnit &&
     left.frequency === right.frequency &&
-    left.frequencyUnit === right.frequencyUnit
+    left.frequencyUnit === right.frequencyUnit &&
+    (left.enabled !== false) === (right.enabled !== false)
   )
 }
 

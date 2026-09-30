@@ -294,7 +294,6 @@ function isHighlighted(row: TableRow): boolean {
                     :style="{ opacity: row.lit ? 1 : 0.3 }"
                     @mouseenter="store.setHoveredPhase(row.phaseId)"
                     @mouseleave="store.setHoveredPhase(null)"
-                    @click="store.togglePinnedPhase(row.phaseId)"
                   >
                     <td class="text-body-2">
                       <div class="phase-name-cell" :class="{ 'phase-name-child': row.child }">
@@ -386,7 +385,6 @@ function isHighlighted(row: TableRow): boolean {
 }
 
 .results-table :deep(tbody tr.phase-breakdown-row) {
-  cursor: pointer;
   transition: opacity 0.2s ease, background-color 0.2s ease;
 }
 

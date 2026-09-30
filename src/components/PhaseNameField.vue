@@ -87,9 +87,27 @@ function onEscape(event: KeyboardEvent) {
   border: 0;
 }
 
+.phase-title-input :deep(.v-field) {
+  align-items: center;
+}
+
+.phase-title-input :deep(.v-field__field) {
+  align-items: center;
+}
+
+.phase-title-input :deep(.v-field__input) {
+  padding-top: 0;
+  padding-bottom: 0;
+  min-height: 0;
+}
+
 .phase-title-input :deep(input) {
-  font-size: 1rem;
+  font-size: 1.25rem;
   font-weight: 500;
-  min-height: 32px;
+  letter-spacing: 0.0125em;
+  line-height: 1.5rem;
+  min-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 </style>

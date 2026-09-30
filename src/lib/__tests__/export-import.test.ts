@@ -156,6 +156,17 @@ describe('importConfigFromJSON', () => {
     }
   })
 
+  it('keeps an interval unit in a version 1 file', () => {
+    const interval = {
+      ...state,
+      phases: state.phases.map((phase) =>
+        phase.isDeepSleep ? phase : { ...phase, frequency: 1, frequencyUnit: 'everyHour' as const },
+      ),
+    }
+    const imported = importConfigFromJSON(stateJson(interval, CONFIG_FORMAT_VERSION))
+    expect(imported.state.phases[0]).toMatchObject({ frequency: 1, frequencyUnit: 'everyHour' })
+  })
+
   it('round-trips the serialized config', () => {
     const imported = importConfigFromJSON(serializeConfig(state))
     expect(imported.state.battery).toEqual(state.battery)

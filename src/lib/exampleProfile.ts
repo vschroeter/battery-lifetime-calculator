@@ -18,7 +18,7 @@ export function createExampleProfile(): CalculatorState {
         duration: 0.2,
         durationUnit: 's',
         frequency: 1,
-        frequencyUnit: 'perHour',
+        frequencyUnit: 'everyHour',
       },
       {
         id: 'deepsleep-1',

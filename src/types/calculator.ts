@@ -1,6 +1,17 @@
 export type CurrentUnit = 'nA' | 'µA' | 'mA' | 'A'
 export type DurationUnit = 'ms' | 's' | 'min' | 'h'
-export type FrequencyUnit = 'perHour' | 'perDay' | 'perWeek'
+export type FrequencyUnit =
+  | 'perMinute'
+  | 'perHour'
+  | 'perDay'
+  | 'perWeek'
+  | 'perMonth'
+  | 'everySecond'
+  | 'everyMinute'
+  | 'everyHour'
+  | 'everyDay'
+  | 'everyWeek'
+  | 'everyMonth'
 
 export interface BatteryConfig {
   capacity_mAh: number
@@ -18,6 +29,8 @@ export interface Phase {
   durationUnit: DurationUnit
   frequency: number
   frequencyUnit: FrequencyUnit
+  /** Omitted or true counts toward lifetime. False keeps the row but drops its load. */
+  enabled?: boolean
 }
 
 export interface LeakageCurrent {
@@ -31,6 +44,8 @@ export interface CalculatorState {
   battery: BatteryConfig
   phases: Phase[]
   leakageCurrents: LeakageCurrent[]
+  /** Omitted or true counts leakage. False keeps the sources but drops their load. */
+  leakageEnabled?: boolean
 }
 
 /** One entered leakage source. Present on the leakage total, and not a separate share of the day. */

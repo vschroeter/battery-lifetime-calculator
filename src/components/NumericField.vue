@@ -6,6 +6,7 @@ import { formatCanonical, parseDraft } from '@/lib/numericInput'
 defineProps<{
   modelValue: number
   label?: string
+  prefix?: string
   suffix?: string
   errorMessage?: string
 }>()
@@ -57,6 +58,7 @@ function onInput(value: string) {
   <v-text-field
     :model-value="shownValue(modelValue)"
     :label="label"
+    :prefix="prefix"
     :suffix="suffix"
     :error-messages="errorMessage ? [errorMessage] : undefined"
     type="text"

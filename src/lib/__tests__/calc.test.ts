@@ -258,6 +258,26 @@ describe('day budget', () => {
     expect(result.phaseResults[0]!.mAhPerDay).toBe(0)
   })
 
+  it('drops a switched-off phase, deep sleep, and leakage from the load', () => {
+    const on = calculate(battery, [phase({ id: 'a', name: 'A' }), sleep], [
+      { id: 'leak', label: 'probe', current: 1, currentUnit: 'mA' },
+    ])
+    const off = calculate(
+      battery,
+      [
+        phase({ id: 'a', name: 'A', enabled: false }),
+        { ...sleep, enabled: false },
+      ],
+      [{ id: 'leak', label: 'probe', current: 1, currentUnit: 'mA' }],
+      false,
+    )
+
+    expect(on.phaseResults.map((row) => row.phaseId)).toEqual(['a', 'sleep', 'leakage-currents-virtual'])
+    expect(off.phaseResults.map((row) => row.phaseId)).toEqual(['sleep'])
+    expect(off.phaseResults[0]!.mAhPerDay).toBe(0)
+    expect(off.totalmAhPerDay).toBe(0)
+  })
+
   it('rejects a negative leakage current', () => {
     const result = calculate(battery, phases, [
       { id: 'leak', label: 'probe', current: -1, currentUnit: 'µA' },

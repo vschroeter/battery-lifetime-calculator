@@ -8,6 +8,7 @@ import type {
   Phase,
 } from '@/types/calculator'
 import { CONFIG_FORMAT_VERSION } from '@/lib/export'
+import { FREQUENCY_UNITS } from '@/lib/units'
 
 export class ConfigImportError extends Error {
   readonly code: string
@@ -43,7 +44,7 @@ const DEFAULT_DEEP_SLEEP: Omit<Phase, 'id'> = {
 
 const CURRENT_UNITS = new Set<CurrentUnit>(['nA', 'µA', 'mA', 'A'])
 const DURATION_UNITS = new Set<DurationUnit>(['ms', 's', 'min', 'h'])
-const FREQUENCY_UNITS = new Set<FrequencyUnit>(['perHour', 'perDay', 'perWeek'])
+const FREQUENCY_UNIT_SET = new Set<FrequencyUnit>(FREQUENCY_UNITS)
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -62,7 +63,7 @@ function isDurationUnit(value: unknown): value is DurationUnit {
 }
 
 function isFrequencyUnit(value: unknown): value is FrequencyUnit {
-  return typeof value === 'string' && FREQUENCY_UNITS.has(value as FrequencyUnit)
+  return typeof value === 'string' && FREQUENCY_UNIT_SET.has(value as FrequencyUnit)
 }
 
 function parseBatteryConfig(value: unknown): BatteryConfig {
@@ -102,6 +103,7 @@ function parsePhase(value: unknown, index: number): Phase {
     durationUnit,
     frequency,
     frequencyUnit,
+    enabled,
   } = value
 
   if (
@@ -128,6 +130,7 @@ function parsePhase(value: unknown, index: number): Phase {
     durationUnit,
     frequency,
     frequencyUnit,
+    enabled: typeof enabled === 'boolean' ? enabled : true,
   }
 }
 
@@ -222,7 +225,7 @@ export function importConfigFromJSON(jsonText: string): ImportResult {
     throw new ConfigImportError('importUnsupportedVersion')
   }
 
-  const { battery, phases, leakageCurrents } = parsed
+  const { battery, phases, leakageCurrents, leakageEnabled } = parsed
 
   if (!Array.isArray(phases) || !Array.isArray(leakageCurrents)) {
     throw new ConfigImportError('importFormatMismatch')
@@ -249,6 +252,7 @@ export function importConfigFromJSON(jsonText: string): ImportResult {
       leakageCurrents.map((leakage, index) => parseLeakageCurrent(leakage, index)),
       'leakage',
     ),
+    leakageEnabled: typeof leakageEnabled === 'boolean' ? leakageEnabled : true,
   }
 
   return {

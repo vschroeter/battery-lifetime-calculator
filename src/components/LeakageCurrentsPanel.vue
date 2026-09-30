@@ -78,15 +78,26 @@ function updateLeakageCurrent(id: string, updates: Partial<{ label: string; curr
       elevation="1"
       @mouseenter="onCardEnter"
       @mouseleave="store.setHoveredPhase(null)"
-      @click="store.togglePinnedPhase(LEAKAGE_PHASE_ID)"
     >
       <v-card-title class="d-flex justify-space-between align-center pa-3 pb-2">
         <div class="d-flex align-center ga-2">
+          <v-switch
+            :model-value="store.leakageEnabled"
+            color="success"
+            density="compact"
+            hide-details
+            inset
+            class="phase-enable"
+            :aria-label="i18n.t('includeInCalculation')"
+            @click.stop
+            @update:model-value="store.setLeakageEnabled($event === true)"
+          />
+          <div class="heading-divider" aria-hidden="true" />
           <div
             class="phase-color-indicator"
             :style="{ backgroundColor: LEAKAGE_CURRENT_COLOR }"
           />
-          <span>{{ i18n.t('leakageCurrents') }}</span>
+          <span class="panel-title">{{ i18n.t('leakageCurrents') }}</span>
         </div>
         <div class="d-flex align-center ga-1">
           <v-tooltip location="top">
@@ -117,7 +128,7 @@ function updateLeakageCurrent(id: string, updates: Partial<{ label: string; curr
           </v-tooltip>
         </div>
       </v-card-title>
-      <v-card-text class="pa-3 pt-2">
+      <v-card-text class="pa-3 pt-2" :class="{ 'phase-body-off': !store.leakageEnabled }">
         <div class="d-flex flex-column ga-1">
           <div
             v-for="leakage in leakageCurrents"
@@ -126,7 +137,6 @@ function updateLeakageCurrent(id: string, updates: Partial<{ label: string; curr
             :class="{ 'leakage-row-highlighted': sourceRowHighlighted(leakage.id) }"
             @mouseenter="onSourceEnter(leakage.id)"
             @mouseleave="onSourceLeave"
-            @click.stop="store.togglePinnedPhase(leakage.id)"
           >
 
             <NumericField
@@ -192,6 +202,13 @@ function updateLeakageCurrent(id: string, updates: Partial<{ label: string; curr
 </template>
 
 <style scoped>
+.panel-title {
+  font-size: 1.25rem;
+  font-weight: 500;
+  letter-spacing: 0.0125em;
+  line-height: 1.5rem;
+}
+
 .modern-card {
   border-radius: 12px;
   border: 1px solid rgba(0, 0, 0, 0.08);
@@ -246,6 +263,28 @@ function updateLeakageCurrent(id: string, updates: Partial<{ label: string; curr
   border-radius: 3px;
   flex-shrink: 0;
   border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.heading-divider {
+  width: 1px;
+  height: 18px;
+  margin: 0 6px 0 2px;
+  background: rgba(15, 23, 42, 0.16);
+  flex: 0 0 auto;
+}
+
+.phase-enable {
+  flex: 0 0 auto;
+  transform: scale(0.8);
+  transform-origin: left center;
+}
+
+.phase-enable :deep(.v-selection-control) {
+  min-height: 22px;
+}
+
+.phase-body-off {
+  opacity: 0.48;
 }
 
 /* Prevent text capitalization in unit toggle buttons */

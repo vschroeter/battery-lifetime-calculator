@@ -117,6 +117,7 @@ export function calculate(
   battery: BatteryConfig,
   phases: Phase[],
   leakageCurrents: LeakageCurrent[] = [],
+  leakageEnabled = true,
 ): CalculationResult {
   const errors: string[] = []
   const warnings: string[] = []
@@ -169,7 +170,7 @@ export function calculate(
 
   // Process non-DeepSleep phases
   for (const phase of phases) {
-    if (!phase.isDeepSleep) {
+    if (!phase.isDeepSleep && phase.enabled !== false) {
       const result = calculatePhaseConsumption(phase)
       totalActiveTimeSeconds += result.activeTimePerDaySeconds
 
@@ -198,7 +199,7 @@ export function calculate(
       0,
     )
 
-    if (leakageCurrents.length > 0 && leakageConsumption_mAhPerDay > 0) {
+    if (leakageEnabled && leakageCurrents.length > 0 && leakageConsumption_mAhPerDay > 0) {
       phaseResults.push({
         phaseId: LEAKAGE_PHASE_ID,
         phaseName: '',
@@ -228,10 +229,9 @@ export function calculate(
   }
 
   const deepSleepPhase = deepSleepPhases[0]!
-  const deepSleepCurrent_mA = convertCurrentTo_mA(
-    deepSleepPhase.current,
-    deepSleepPhase.currentUnit,
-  )
+  const deepSleepCurrent_mA = deepSleepPhase.enabled === false
+    ? 0
+    : convertCurrentTo_mA(deepSleepPhase.current, deepSleepPhase.currentUnit)
   phaseResults.push({
     phaseId: deepSleepPhase.id,
     phaseName: deepSleepPhase.name,
