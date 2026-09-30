@@ -94,6 +94,20 @@ export function formatCount(value: number): string {
   return formatSignificant(value)
 }
 
+export function formatFixed(value: number, fractionDigits: number, locale: 'de' | 'en'): string {
+  const tag = locale === 'de' ? 'de-DE' : 'en-US'
+  return value.toLocaleString(tag, {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+    useGrouping: true,
+  })
+}
+
+/** Years stay hidden until one decimal place would read as at least 0.1. */
+export function runtimeYearsVisible(runtimeYears: number): boolean {
+  return Number(runtimeYears.toFixed(1)) >= 0.1
+}
+
 export function formatPercent(percent: number): string {
   if (!(percent > 0)) {
     return '0%'

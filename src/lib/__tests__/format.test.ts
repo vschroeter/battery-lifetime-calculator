@@ -6,7 +6,9 @@ import {
   formatChargePerDay,
   formatCount,
   formatCurrentFromMilliAmps,
+  formatFixed,
   formatQuantity,
+  runtimeYearsVisible,
 } from '@/lib/format'
 import type { BatteryConfig, Phase } from '@/types/calculator'
 
@@ -66,6 +68,20 @@ describe('default profile display', () => {
     expect(current.unit).toBe('µA')
     expect(current.text).not.toBe('0')
     expect(current.text).not.toBe('0.000')
+  })
+})
+
+describe('lifetime figures', () => {
+  it('formats one decimal place with the active locale', () => {
+    expect(formatFixed(10.04, 1, 'en')).toBe('10.0')
+    expect(formatFixed(10.04, 1, 'de')).toBe('10,0')
+    expect(formatFixed(1234.56, 1, 'de')).toBe('1.234,6')
+  })
+
+  it('hides years until one decimal would show at least 0.1', () => {
+    expect(runtimeYearsVisible(10 / 365.24219)).toBe(false)
+    expect(runtimeYearsVisible(0.049)).toBe(false)
+    expect(runtimeYearsVisible(0.05)).toBe(true)
   })
 })
 

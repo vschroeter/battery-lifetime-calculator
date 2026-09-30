@@ -2,7 +2,7 @@ export type Locale = 'de' | 'en'
 
 export const messages: Record<Locale, Record<string, string>> = {
   de: {
-    appTitle: 'Battery Lifetime Calculator',
+    appTitle: 'Batterie-Laufzeitrechner',
     batteryConfig: 'Batterie-Konfiguration',
     batteryBasic: 'Grundeigenschaften',
     batteryBasicHint: 'Chemie, Zelle und Nennkapazität.',
@@ -111,7 +111,7 @@ export const messages: Record<Locale, Record<string, string>> = {
     weeks: 'Wochen',
     months: 'Monate',
     years: 'Jahre',
-    monthNote: 'Monat = 30.44 Tage',
+    monthNote: 'Monat = 30,44 Tage',
     consumptionByPhase: 'Verbrauch nach Phase',
     phase: 'Phase',
     eventsPerDay: 'Ereignisse/Tag',

@@ -7,7 +7,9 @@ import {
   formatChargePerDay,
   formatCount,
   formatCurrentFromMilliAmps,
+  formatFixed,
   formatQuantity,
+  runtimeYearsVisible,
 } from '@/lib/format'
 import {
   leakageAggregateName,
@@ -36,6 +38,14 @@ const averageCurrent = computed(() =>
 )
 const dailyCharge = computed(() =>
   displayResult.value ? formatChargePerDay(displayResult.value.totalmAhPerDay) : null,
+)
+
+function formatRuntime(value: number): string {
+  return formatFixed(value, 1, locale.value)
+}
+
+const showYears = computed(() =>
+  displayResult.value ? runtimeYearsVisible(displayResult.value.runtimeYears) : false,
 )
 
 const statusLine = computed(() => {
@@ -247,14 +257,12 @@ function isHighlighted(row: TableRow): boolean {
             <v-card-text class="pa-3">
               <div class="text-body-2 text-medium-emphasis mb-1">{{ i18n.t('estimatedRuntime') }}</div>
               <div class="text-h4 font-weight-medium mb-1">
-                {{ displayResult.runtimeDays.toFixed(1) }} <span class="text-h6">{{ i18n.t('days') }}</span>
+                {{ formatRuntime(displayResult.runtimeDays) }} <span class="text-h6">{{ i18n.t('days') }}</span>
               </div>
               <div class="text-body-2 text-medium-emphasis">
-                {{ displayResult.runtimeWeeks.toFixed(1) }} {{ i18n.t('weeks') }},
-                {{ displayResult.runtimeMonths.toFixed(1) }} {{ i18n.t('months') }}
-                <template v-if="displayResult.runtimeYears > 0">
-                  , {{ displayResult.runtimeYears.toFixed(1) }} {{ i18n.t('years') }}
-                </template>
+                {{ formatRuntime(displayResult.runtimeWeeks) }} {{ i18n.t('weeks') }},
+                {{ formatRuntime(displayResult.runtimeMonths) }} {{ i18n.t('months') }}
+                ({{ i18n.t('monthNote') }})<template v-if="showYears">, {{ formatRuntime(displayResult.runtimeYears) }} {{ i18n.t('years') }}</template>
               </div>
             </v-card-text>
           </v-card>
