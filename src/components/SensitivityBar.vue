@@ -120,14 +120,14 @@ function getBarColor(change: number): string {
 <style scoped>
 .sensitivity-item {
   padding: 8px;
-  background-color: #f5f5f5;
+  background-color: rgba(var(--v-theme-on-surface), 0.06);
   border-radius: 4px;
 }
 
 .sensitivity-bar-container {
   width: 100%;
   height: 8px;
-  background-color: #e0e0e0;
+  background-color: rgba(var(--v-theme-on-surface), 0.16);
   border-radius: 4px;
   display: flex;
   align-items: center;

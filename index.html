@@ -2,6 +2,23 @@
 <html lang="">
   <head>
     <meta charset="UTF-8">
+    <style>
+      html[data-theme="light"] { background: #f4f7fb; }
+      html[data-theme="dark"] { background: #07161d; }
+    </style>
+    <script>
+      // Keep in sync with src/lib/themePreference.ts
+      (function () {
+        var stored = null
+        try { stored = localStorage.getItem('blc-theme') } catch (e) {}
+        var preference = stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'system'
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+        var theme = preference === 'light' || preference === 'dark' ? preference : (prefersDark ? 'dark' : 'light')
+        var root = document.documentElement
+        root.dataset.theme = theme
+        root.style.colorScheme = theme
+      })()
+    </script>
     <link rel="icon" href="/favicon.ico">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Battery Lifetime Calculator</title>

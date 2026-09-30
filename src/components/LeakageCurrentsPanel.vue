@@ -211,7 +211,7 @@ function updateLeakageCurrent(id: string, updates: Partial<{ label: string; curr
 
 .modern-card {
   border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
 }
 
 .leakage-currents-card {
@@ -238,7 +238,7 @@ function updateLeakageCurrent(id: string, updates: Partial<{ label: string; curr
 }
 
 .leakage-row:hover {
-  background-color: rgba(0, 0, 0, 0.02);
+  background-color: rgba(var(--v-theme-on-surface), 0.06);
 }
 
 .leakage-row-highlighted {
@@ -262,14 +262,14 @@ function updateLeakageCurrent(id: string, updates: Partial<{ label: string; curr
   height: 16px;
   border-radius: 3px;
   flex-shrink: 0;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.16);
 }
 
 .heading-divider {
   width: 1px;
   height: 18px;
   margin: 0 6px 0 2px;
-  background: rgba(15, 23, 42, 0.16);
+  background: rgba(var(--v-theme-on-surface), 0.16);
   flex: 0 0 auto;
 }
 

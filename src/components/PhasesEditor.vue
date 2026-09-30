@@ -718,7 +718,7 @@ function isHighlighted(id: string): boolean {
 <style scoped>
 .modern-card {
   border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
 }
 
 .phase-card {
@@ -772,14 +772,14 @@ function isHighlighted(id: string): boolean {
   height: 16px;
   border-radius: 3px;
   flex-shrink: 0;
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.16);
 }
 
 .heading-divider {
   width: 1px;
   height: 18px;
   margin: 0 6px 0 2px;
-  background: rgba(15, 23, 42, 0.16);
+  background: rgba(var(--v-theme-on-surface), 0.16);
   flex: 0 0 auto;
 }
 
@@ -791,7 +791,7 @@ function isHighlighted(id: string): boolean {
   width: 1px;
   height: 18px;
   margin: 0 2px;
-  background: rgba(15, 23, 42, 0.15);
+  background: rgba(var(--v-theme-on-surface), 0.15);
   flex: 0 0 auto;
 }
 
@@ -828,14 +828,14 @@ function isHighlighted(id: string): boolean {
   font-weight: 650;
   font-size: 0.95rem;
   line-height: 1.2;
-  color: rgb(15, 23, 42);
+  color: rgb(var(--v-theme-on-surface));
 }
 
 .measure-hint {
   margin-top: 2px;
   font-size: 0.8rem;
   line-height: 1.3;
-  color: rgba(15, 23, 42, 0.55);
+  color: rgba(var(--v-theme-on-surface), 0.55);
 }
 
 .measure-value {
@@ -845,7 +845,7 @@ function isHighlighted(id: string): boolean {
 .interval-box {
   padding: 14px;
   border-radius: 14px;
-  background: #f4f7fb;
+  background: rgb(var(--v-theme-background));
 }
 
 .interval-head {
@@ -863,9 +863,9 @@ function isHighlighted(id: string): boolean {
   align-items: center;
   gap: 8px;
   padding: 8px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
   border-radius: 12px;
-  background: #fff;
+  background: rgb(var(--v-theme-surface));
 }
 
 .interval-sentence .measure-value {
@@ -891,10 +891,10 @@ function isHighlighted(id: string): boolean {
   margin-left: auto;
   padding: 4px 8px 4px 10px;
   border: 0;
-  border-left: 1px solid rgba(15, 23, 42, 0.12);
+  border-left: 1px solid rgba(var(--v-theme-on-surface), 0.12);
   border-radius: 0;
   background: transparent;
-  color: rgb(15, 23, 42);
+  color: rgb(var(--v-theme-on-surface));
   font: inherit;
   font-weight: 650;
   white-space: nowrap;
@@ -916,15 +916,11 @@ function isHighlighted(id: string): boolean {
   min-height: 36px;
 }
 
-.mode-toggle :deep(.v-btn--active) {
-  background: #e8f1ff !important;
-  color: #1d4ed8 !important;
-  border-color: #93c5fd !important;
-}
-
+.mode-toggle :deep(.v-btn--active),
 .unit-toggle :deep(.v-btn--active) {
-  background: #dbeafe !important;
-  color: #1e3a5f !important;
+  background: rgba(var(--v-theme-primary), 0.16) !important;
+  color: rgb(var(--v-theme-primary)) !important;
+  border-color: rgba(var(--v-theme-primary), 0.45) !important;
 }
 
 @media (max-width: 720px) {

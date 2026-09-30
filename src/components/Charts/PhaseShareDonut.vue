@@ -198,7 +198,6 @@ function renderChart() {
     .append('path')
     .attr('d', (d) => getArc(d)?.(d) ?? '')
     .attr('fill', (d) => getColorForPhaseResult(d.data))
-    .attr('stroke', 'white')
     .attr('stroke-width', 1)
     .attr('class', (d) => `arc-path arc-${d.data.phaseId}`)
     .attr('data-phase-id', (d) => d.data.phaseId)
@@ -310,7 +309,7 @@ const segments = computed(() => {
 <style scoped>
 .modern-card {
   border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
 }
 .chart-layout {
   display: flex;
@@ -321,6 +320,10 @@ const segments = computed(() => {
 
 .donut-chart {
   flex: 0 0 auto;
+}
+
+.donut-chart :deep(.arc-path) {
+  stroke: rgb(var(--v-theme-surface));
 }
 
 .chart-legend {
@@ -343,7 +346,7 @@ const segments = computed(() => {
 }
 
 .legend-entry-highlighted {
-  background-color: rgba(0, 0, 0, 0.05);
+  background-color: rgba(var(--v-theme-on-surface), 0.08);
 }
 </style>
 

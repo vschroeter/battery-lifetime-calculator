@@ -356,7 +356,7 @@ function isHighlighted(row: TableRow): boolean {
 <style scoped>
 .modern-card {
   border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
 }
 
 /* Results card layout */
@@ -391,13 +391,13 @@ function isHighlighted(row: TableRow): boolean {
 }
 
 .results-table :deep(thead th) {
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.12);
   padding: 8px 16px;
 }
 
 .results-table :deep(tbody td) {
   padding: 8px 16px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  border-bottom: 1px solid rgba(var(--v-theme-on-surface), 0.08);
 }
 
 .results-table :deep(tbody tr:last-child td) {
@@ -409,7 +409,7 @@ function isHighlighted(row: TableRow): boolean {
 }
 
 .results-table :deep(tbody tr.phase-breakdown-row-highlighted td) {
-  background-color: rgba(0, 0, 0, 0.05);
+  background-color: rgba(var(--v-theme-on-surface), 0.08);
 }
 
 .phase-name-cell {
