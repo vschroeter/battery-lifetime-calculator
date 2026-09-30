@@ -211,6 +211,47 @@ describe('importConfigFromJSON', () => {
     expect(imported.state.battery.efficiencyPresetId).toBeNull()
   })
 
+  it('drops extra deep-sleep phases and reports how many', () => {
+    const extra: CalculatorState = {
+      ...state,
+      phases: [
+        state.phases[0]!,
+        state.phases[1]!,
+        { ...state.phases[1]!, id: 'deepsleep-2', name: 'Second sleep' },
+        { ...state.phases[1]!, id: 'deepsleep-3', name: 'Third sleep' },
+      ],
+    }
+
+    const imported = importConfigFromJSON(stateJson(extra))
+
+    expect(imported.notices).toEqual([{ code: 'droppedDeepSleep', count: 2 }])
+    expect(imported.state.phases.map((phase) => phase.name)).toEqual(['Say "hi"', 'DeepSleep'])
+  })
+
+  it('adds the default deep sleep when the file has none', () => {
+    const awake: CalculatorState = {
+      ...state,
+      phases: state.phases.filter((phase) => !phase.isDeepSleep),
+    }
+
+    const imported = importConfigFromJSON(stateJson(awake))
+    const sleep = imported.state.phases.find((phase) => phase.isDeepSleep)
+
+    expect(imported.notices).toEqual([{ code: 'addedDefaultDeepSleep' }])
+    expect(sleep).toMatchObject({
+      name: 'DeepSleep',
+      isDeepSleep: true,
+      current: 0.01,
+      currentUnit: 'mA',
+      duration: 0,
+      durationUnit: 's',
+      frequency: 0,
+      frequencyUnit: 'perHour',
+    })
+    expect(sleep!.id).not.toBe('')
+    expect(imported.state.phases.filter((phase) => phase.isDeepSleep)).toHaveLength(1)
+  })
+
   it('round-trips the serialized config', () => {
     const imported = importConfigFromJSON(serializeConfig(state))
     expect(imported.state.battery).toEqual(state.battery)

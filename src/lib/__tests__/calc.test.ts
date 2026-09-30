@@ -30,6 +30,85 @@ const phases: Phase[] = [
   },
 ]
 
+describe('example profile', () => {
+  it('lasts 2307.8 days at 0.346653 mAh/day with no self-discharge', () => {
+    const profile = createExampleProfile()
+    const result = calculate(profile.battery, profile.phases, profile.leakageCurrents)
+    const active = result.phaseResults.find((row) => row.phaseId === 'active-1')
+
+    expect(result.errors).toEqual([])
+    expect(result.dayBudgetExceeded).toBe(false)
+    expect(active!.activeTimePerDaySeconds).toBeCloseTo(4.8, 9)
+    expect(active!.mAhPerDay).toBeCloseTo(0.10666666666666667, 10)
+    expect(result.totalmAhPerDay).toBeCloseTo(0.3466533333333333, 9)
+    expect(result.runtimeDays).toBeCloseTo(2307.7810685026348, 6)
+    expect(result.phaseResults.some((row) => row.phaseId === 'self-discharge-virtual')).toBe(false)
+  })
+})
+
+describe('self-discharge limit', () => {
+  const cell: BatteryConfig = {
+    ...battery,
+    capacity_mAh: 1000,
+    usablePercent: 80,
+    efficiencyPercent: 100,
+    selfDischargePercentPerMonth: 0,
+  }
+  const load: Phase[] = [
+    phase({
+      id: 'load',
+      name: 'Load',
+      current: 10,
+      duration: 1,
+      durationUnit: 'h',
+      frequency: 1,
+      frequencyUnit: 'perDay',
+    }),
+    phase({
+      id: 'sleep',
+      name: 'DeepSleep',
+      isDeepSleep: true,
+      current: 0,
+      duration: 0,
+      frequency: 0,
+    }),
+  ]
+
+  it('drains 800 mAh at 10 mAh/day in exactly 80 days when the rate is zero', () => {
+    const result = calculate(cell, load)
+
+    expect(result.runtimeDays).toBe(80)
+    expect(result.totalmAhPerDay).toBe(10)
+    expect(result.phaseResults.some((row) => row.phaseId === 'self-discharge-virtual')).toBe(false)
+  })
+
+  it('approaches 80 days from below as the monthly rate approaches zero', () => {
+    const result = calculate(cell, load)
+    const fading = calculate(
+      { ...cell, selfDischargePercentPerMonth: 0.000001 },
+      load,
+    )
+
+    expect(fading.runtimeDays).toBeLessThan(result.runtimeDays)
+    expect(fading.runtimeDays).toBeCloseTo(80, 5)
+    const selfDischarge = fading.phaseResults.find((row) => row.phaseId === 'self-discharge-virtual')
+    expect(selfDischarge!.mAhPerDay).toBeGreaterThan(0)
+    expect(selfDischarge!.mAhPerDay).toBeLessThan(0.001)
+  })
+
+  it('shortens that same load to 77.948 days at 2% per month', () => {
+    const result = calculate(
+      { ...cell, selfDischargePercentPerMonth: 2 },
+      load,
+    )
+
+    expect(result.runtimeDays).toBeCloseTo(77.94829259445403, 8)
+    expect(result.runtimeDays).toBeLessThan(80)
+    const selfDischarge = result.phaseResults.find((row) => row.phaseId === 'self-discharge-virtual')
+    expect(selfDischarge!.mAhPerDay).toBeCloseTo(0.26321389952958896, 8)
+  })
+})
+
 describe('calculate leakage and self-discharge', () => {
   it('keeps a 20 nA leakage source in the result', () => {
     const result = calculate(battery, phases, [
