@@ -13,6 +13,7 @@ import {
   type FieldIssue,
 } from '@/lib/fields'
 import { createExampleProfile } from '@/lib/exampleProfile'
+import { LEAKAGE_PHASE_ID } from '@/lib/leakage'
 import { duplicatePhaseName, insertAfterPhase, placeActivePhase } from '@/lib/phaseList'
 import type {
   BatteryConfig,
@@ -220,12 +221,29 @@ export const useCalculatorStore = defineStore('calculator', () => {
     }
   }
 
+  function clearHighlight(id: string) {
+    if (hoveredPhaseId.value === id) {
+      hoveredPhaseId.value = null
+    }
+    if (pinnedPhaseId.value === id) {
+      pinnedPhaseId.value = null
+    }
+  }
+
   function removeLeakageCurrent(id: string) {
     leakageCurrents.value = leakageCurrents.value.filter((l) => l.id !== id)
     forgetKeysWithPrefix(leakageFieldKey(id))
+    clearHighlight(id)
+    if (leakageCurrents.value.length === 0) {
+      clearHighlight(LEAKAGE_PHASE_ID)
+    }
   }
 
   function removeAllLeakageCurrents() {
+    for (const leakage of leakageCurrents.value) {
+      clearHighlight(leakage.id)
+    }
+    clearHighlight(LEAKAGE_PHASE_ID)
     leakageCurrents.value = []
     const next = { ...lastLegal.value }
     for (const key of Object.keys(next)) {

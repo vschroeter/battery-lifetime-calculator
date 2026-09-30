@@ -6,6 +6,7 @@ import type {
   LeakageCurrent,
 } from '@/types/calculator'
 import { isLegal } from '@/lib/fields'
+import { LEAKAGE_PHASE_ID } from '@/lib/leakage'
 import {
   convertCurrentTo_mA,
   convertDurationToHours,
@@ -186,19 +187,25 @@ export function calculate(
 
   function appendLeakage() {
     // Permanent load, outside the 24 h phase budget: current × 24 h.
-    const leakageConsumption_mAhPerDay = leakageCurrents.reduce((sum, leakage) => {
-      const current_mA = convertCurrentTo_mA(leakage.current, leakage.currentUnit)
-      return sum + current_mA * 24
-    }, 0)
+    // Sources stay on the total. They are not separate rows in the daily sum.
+    const leakageSources = leakageCurrents.map((leakage) => ({
+      id: leakage.id,
+      label: leakage.label,
+      mAhPerDay: convertCurrentTo_mA(leakage.current, leakage.currentUnit) * 24,
+    }))
+    const leakageConsumption_mAhPerDay = leakageSources.reduce(
+      (sum, source) => sum + source.mAhPerDay,
+      0,
+    )
 
     if (leakageCurrents.length > 0 && leakageConsumption_mAhPerDay > 0) {
-      const leakageLabels = leakageCurrents.map((l) => l.label || '').join(', ')
       phaseResults.push({
-        phaseId: 'leakage-currents-virtual',
-        phaseName: `Sum of Leakage Currents${leakageLabels ? ` (${leakageLabels})` : ''}`,
+        phaseId: LEAKAGE_PHASE_ID,
+        phaseName: '',
         mAhPerDay: leakageConsumption_mAhPerDay,
         eventsPerDay: 0,
         activeTimePerDaySeconds: SECONDS_PER_DAY,
+        leakageSources,
       })
     }
   }

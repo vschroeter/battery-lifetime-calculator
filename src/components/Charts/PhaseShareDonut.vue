@@ -4,6 +4,8 @@ import * as d3 from 'd3'
 import { useLocale } from '@/composables/useLocale'
 import { useCalculatorStore } from '@/stores/calculator'
 import { getColorForPhaseId } from '@/lib/phaseColors'
+import { leakageAggregateName, leakageShareLit, LEAKAGE_PHASE_ID } from '@/lib/leakage'
+import { getMessage } from '@/i18n/messages'
 import { formatChargePerDay, formatPercent, formatQuantity } from '@/lib/format'
 import type { PhaseResult } from '@/types/calculator'
 
@@ -12,7 +14,7 @@ interface Props {
 }
 
 const props = defineProps<Props>()
-const { i18n } = useLocale()
+const { i18n, locale } = useLocale()
 const store = useCalculatorStore()
 
 const chartContainer = ref<SVGElement | null>(null)
@@ -51,11 +53,36 @@ const DEEPSLEEP_WIDTH = 20 // Thinnest
 // Outer radius (same for all)
 const outerRadius = Math.min(width, height) / 2
 
+const leakageSourceIds = computed(() =>
+  props.phaseResults.find((result) => result.phaseId === LEAKAGE_PHASE_ID)?.leakageSources?.map((source) => source.id) ?? [],
+)
+
+function shareOpaque(phaseId: string): number {
+  const highlighted = store.highlightedPhaseId
+  if (highlighted === null) {
+    return 1
+  }
+  if (phaseId === LEAKAGE_PHASE_ID) {
+    return leakageShareLit(highlighted, leakageSourceIds.value) ? 1 : 0.3
+  }
+  return highlighted === phaseId ? 1 : 0.3
+}
+
+function segmentName(result: PhaseResult): string {
+  if (result.phaseId === LEAKAGE_PHASE_ID && result.leakageSources) {
+    return leakageAggregateName(result.leakageSources, {
+      group: getMessage(locale.value, 'leakageCurrents'),
+      source: getMessage(locale.value, 'leakageSourceNumber'),
+    })
+  }
+  return result.phaseName
+}
+
 function getPhaseType(result: PhaseResult): 'active' | 'self-discharge' | 'leakage-current' | 'deepsleep' {
   if (result.phaseId === 'self-discharge-virtual') {
     return 'self-discharge'
   }
-  if (result.phaseId === 'leakage-currents-virtual') {
+  if (result.phaseId === LEAKAGE_PHASE_ID) {
     return 'leakage-current'
   }
   const phase = store.phases.find((p) => p.id === result.phaseId)
@@ -80,7 +107,7 @@ function getInnerRadius(phaseType: 'active' | 'self-discharge' | 'leakage-curren
 
 function getColorForPhaseResult(result: PhaseResult): string {
   // Handle virtual phases (leakage currents, self-discharge)
-  if (result.phaseId === 'leakage-currents-virtual' || result.phaseId === 'self-discharge-virtual') {
+  if (result.phaseId === LEAKAGE_PHASE_ID || result.phaseId === 'self-discharge-virtual') {
     return getColorForPhaseId(
       result.phaseId,
       nonDeepSleepPhases.value.map((p) => p.id),
@@ -177,12 +204,7 @@ function renderChart() {
     .attr('data-phase-id', (d) => d.data.phaseId)
     .style('cursor', 'pointer')
     .style('transition', 'opacity 0.2s ease')
-    .style('opacity', (d) => {
-      if (store.highlightedPhaseId === null) {
-        return 1
-      }
-      return store.highlightedPhaseId === d.data.phaseId ? 1 : 0.3
-    })
+    .style('opacity', (d) => shareOpaque(d.data.phaseId))
     .on('mouseenter', function (_event, d) {
       store.setHoveredPhase(d.data.phaseId)
     })
@@ -200,10 +222,7 @@ function updateArcStyles() {
   }
   const svg = d3.select(chartContainer.value)
   svg.selectAll<SVGPathElement, d3.PieArcDatum<PhaseResult>>('path.arc-path').style('opacity', function (d) {
-    if (store.highlightedPhaseId === null) {
-      return 1
-    }
-    return store.highlightedPhaseId === d.data.phaseId ? 1 : 0.3
+    return shareOpaque(d.data.phaseId)
   })
 }
 
@@ -242,6 +261,7 @@ const segments = computed(() => {
     const percentage = (result.mAhPerDay / total.value) * 100
     return {
       ...result,
+      phaseName: segmentName(result),
       percentage,
     }
   })
@@ -266,10 +286,8 @@ const segments = computed(() => {
             v-for="seg in segments"
             :key="seg.phaseId"
             class="d-flex align-center mb-2 legend-entry"
-            :class="{ 'legend-entry-highlighted': store.highlightedPhaseId === seg.phaseId }"
-            :style="{
-              opacity: store.highlightedPhaseId === null || store.highlightedPhaseId === seg.phaseId ? 1 : 0.3,
-            }"
+            :class="{ 'legend-entry-highlighted': shareOpaque(seg.phaseId) === 1 && store.highlightedPhaseId !== null }"
+            :style="{ opacity: shareOpaque(seg.phaseId) }"
             @mouseenter="store.setHoveredPhase(seg.phaseId)"
             @mouseleave="store.setHoveredPhase(null)"
             @click="store.togglePinnedPhase(seg.phaseId)"

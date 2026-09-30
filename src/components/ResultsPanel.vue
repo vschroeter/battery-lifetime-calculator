@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useCalculatorStore } from '@/stores/calculator'
 import { useLocale } from '@/composables/useLocale'
 import {
@@ -9,10 +9,21 @@ import {
   formatCurrentFromMilliAmps,
   formatQuantity,
 } from '@/lib/format'
+import {
+  leakageAggregateName,
+  leakageParentLit,
+  leakageSourceLit,
+  leakageSourceName,
+  LEAKAGE_PHASE_ID,
+  type LeakageNameLabels,
+} from '@/lib/leakage'
+import { getMessage } from '@/i18n/messages'
 import PhaseShareDonut from '@/components/Charts/PhaseShareDonut.vue'
+import type { PhaseResult } from '@/types/calculator'
 
 const store = useCalculatorStore()
-const { i18n } = useLocale()
+const { i18n, locale } = useLocale()
+const leakageExpanded = ref(false)
 
 const presentation = computed(() => store.presentation)
 const displayResult = computed(() => presentation.value.result)
@@ -72,8 +83,94 @@ const dayBudgetMessage = computed(() => {
     .replace('{seconds}', formatBudgetSeconds(seconds))
 })
 
-function isHighlighted(phaseId: string): boolean {
-  return store.highlightedPhaseId === phaseId
+interface TableRow {
+  key: string
+  phaseId: string
+  name: string
+  mAhPerDay: number
+  events: string | null
+  activeTime: string | null
+  child: boolean
+  expandable: boolean
+  lit: boolean
+}
+
+const leakageNames = computed<LeakageNameLabels>(() => ({
+  group: getMessage(locale.value, 'leakageCurrents'),
+  source: getMessage(locale.value, 'leakageSourceNumber'),
+}))
+
+const tableRows = computed<TableRow[]>(() => {
+  const result = displayResult.value
+  if (!result) {
+    return []
+  }
+  const rows: TableRow[] = []
+  for (const phase of result.phaseResults) {
+    if (phase.phaseId === LEAKAGE_PHASE_ID && phase.leakageSources) {
+      rows.push(...leakageRows(phase))
+      continue
+    }
+    rows.push(phaseRow(phase))
+  }
+  return rows
+})
+
+function phaseRow(phase: PhaseResult): TableRow {
+  const highlighted = store.highlightedPhaseId
+  return {
+    key: phase.phaseId,
+    phaseId: phase.phaseId,
+    name: phase.phaseName,
+    mAhPerDay: phase.mAhPerDay,
+    events: eventsLabel(phase.eventsPerDay),
+    activeTime: activeTimeLabel(phase),
+    child: false,
+    expandable: false,
+    lit: highlighted === null || highlighted === phase.phaseId,
+  }
+}
+
+function leakageRows(phase: PhaseResult): TableRow[] {
+  const sources = phase.leakageSources ?? []
+  const sourceIds = sources.map((source) => source.id)
+  const nestOpen = leakageExpanded.value && sources.length > 1
+  const highlighted = store.highlightedPhaseId
+  const parentLit = leakageParentLit(highlighted, sourceIds, nestOpen)
+  const rows: TableRow[] = [
+    {
+      key: phase.phaseId,
+      phaseId: phase.phaseId,
+      name: leakageAggregateName(sources, leakageNames.value),
+      mAhPerDay: phase.mAhPerDay,
+      events: eventsLabel(phase.eventsPerDay),
+      activeTime: activeTimeLabel(phase),
+      child: false,
+      expandable: sources.length > 1,
+      lit: parentLit,
+    },
+  ]
+  if (!nestOpen) {
+    return rows
+  }
+  sources.forEach((source, index) => {
+    rows.push({
+      key: source.id,
+      phaseId: source.id,
+      name: leakageSourceName(source.label, index + 1, leakageNames.value),
+      mAhPerDay: source.mAhPerDay,
+      events: null,
+      activeTime: null,
+      child: true,
+      expandable: false,
+      lit: leakageSourceLit(highlighted, source.id),
+    })
+  })
+  return rows
+}
+
+function isHighlighted(row: TableRow): boolean {
+  return store.highlightedPhaseId !== null && row.lit
 }
 </script>
 
@@ -190,27 +287,39 @@ function isHighlighted(phaseId: string): boolean {
                 </thead>
                 <tbody>
                   <tr
-                    v-for="result in displayResult.phaseResults"
-                    :key="result.phaseId"
+                    v-for="row in tableRows"
+                    :key="row.key"
                     class="phase-breakdown-row"
-                    :class="{ 'phase-breakdown-row-highlighted': isHighlighted(result.phaseId) }"
-                    :style="{
-                      opacity:
-                        store.highlightedPhaseId === null || isHighlighted(result.phaseId) ? 1 : 0.3,
-                    }"
-                    @mouseenter="store.setHoveredPhase(result.phaseId)"
+                    :class="{ 'phase-breakdown-row-highlighted': isHighlighted(row) }"
+                    :style="{ opacity: row.lit ? 1 : 0.3 }"
+                    @mouseenter="store.setHoveredPhase(row.phaseId)"
                     @mouseleave="store.setHoveredPhase(null)"
-                    @click="store.togglePinnedPhase(result.phaseId)"
+                    @click="store.togglePinnedPhase(row.phaseId)"
                   >
-                    <td class="text-body-2">{{ result.phaseName }}</td>
-                    <td class="text-end text-body-2">
-                      {{ formatQuantity(formatChargePerDay(result.mAhPerDay)) }}
+                    <td class="text-body-2">
+                      <div class="phase-name-cell" :class="{ 'phase-name-child': row.child }">
+                        <v-btn
+                          v-if="row.expandable"
+                          :icon="leakageExpanded ? 'mdi-chevron-down' : 'mdi-chevron-right'"
+                          variant="text"
+                          size="x-small"
+                          density="compact"
+                          class="leakage-expand"
+                          :aria-expanded="leakageExpanded"
+                          :aria-label="i18n.t(leakageExpanded ? 'hideLeakageSources' : 'showLeakageSources')"
+                          @click.stop="leakageExpanded = !leakageExpanded"
+                        />
+                        <span>{{ row.name }}</span>
+                      </div>
                     </td>
                     <td class="text-end text-body-2">
-                      {{ eventsLabel(result.eventsPerDay) }}
+                      {{ formatQuantity(formatChargePerDay(row.mAhPerDay)) }}
                     </td>
                     <td class="text-end text-body-2">
-                      {{ activeTimeLabel(result) }}
+                      {{ row.events }}
+                    </td>
+                    <td class="text-end text-body-2">
+                      {{ row.activeTime }}
                     </td>
                   </tr>
                 </tbody>
@@ -283,6 +392,20 @@ function isHighlighted(phaseId: string): boolean {
 
 .results-table :deep(tbody tr.phase-breakdown-row-highlighted td) {
   background-color: rgba(0, 0, 0, 0.05);
+}
+
+.phase-name-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.phase-name-child {
+  padding-left: 28px;
+}
+
+.leakage-expand {
+  flex: 0 0 auto;
 }
 
 /* Responsive: Stack result tiles on small screens */

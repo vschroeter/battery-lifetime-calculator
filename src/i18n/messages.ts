@@ -114,6 +114,9 @@ export const messages: Record<Locale, Record<string, string>> = {
     label: 'Bezeichnung',
     addLeakageCurrent: 'Leckstrom hinzufügen',
     removeAllLeakageCurrents: 'Alle Leckströme entfernen',
+    showLeakageSources: 'Leckstromquellen anzeigen',
+    hideLeakageSources: 'Leckstromquellen ausblenden',
+    leakageSourceNumber: 'Leckstrom {n}',
   },
   en: {
     appTitle: 'Battery Lifetime Calculator',
@@ -226,6 +229,9 @@ export const messages: Record<Locale, Record<string, string>> = {
     label: 'Label',
     addLeakageCurrent: 'Add Leakage Current',
     removeAllLeakageCurrents: 'Remove All Leakage Currents',
+    showLeakageSources: 'Show leakage sources',
+    hideLeakageSources: 'Hide leakage sources',
+    leakageSourceNumber: 'Leakage {n}',
   },
 }
 

@@ -6,6 +6,7 @@ import { LEAKAGE_CURRENT_COLOR } from '@/lib/phaseColors'
 import NumericField from '@/components/NumericField.vue'
 import { useFieldMessage } from '@/composables/useFieldMessage'
 import { leakageFieldKey } from '@/lib/fields'
+import { leakageSourceLit, LEAKAGE_PHASE_ID } from '@/lib/leakage'
 import type { CurrentUnit } from '@/types/calculator'
 
 const store = useCalculatorStore()
@@ -14,10 +15,39 @@ const { message } = useFieldMessage()
 
 const leakageCurrents = computed(() => store.leakageCurrents)
 const hasLeakageCurrents = computed(() => leakageCurrents.value.length > 0)
-const LEAKAGE_CURRENT_PHASE_ID = 'leakage-currents-virtual'
-const isLeakageCurrentHovered = computed(
-  () => store.highlightedPhaseId === LEAKAGE_CURRENT_PHASE_ID,
+const isLeakageGroupHighlighted = computed(
+  () => store.highlightedPhaseId === LEAKAGE_PHASE_ID,
 )
+
+function sourceRowHighlighted(id: string): boolean {
+  return store.highlightedPhaseId !== null && leakageSourceLit(store.highlightedPhaseId, id)
+}
+
+function onCardEnter(event: MouseEvent) {
+  const target = event.target
+  if (target instanceof Element && target.closest('.leakage-row')) {
+    return
+  }
+  store.setHoveredPhase(LEAKAGE_PHASE_ID)
+}
+
+function onSourceEnter(id: string) {
+  store.setHoveredPhase(id)
+}
+
+function onSourceLeave(event: MouseEvent) {
+  const row = event.currentTarget
+  const next = event.relatedTarget
+  if (row instanceof Node && next instanceof Node && row.contains(next)) {
+    return
+  }
+  const card = row instanceof Element ? row.closest('.leakage-currents-card') : null
+  if (card && next instanceof Node && card.contains(next)) {
+    store.setHoveredPhase(LEAKAGE_PHASE_ID)
+    return
+  }
+  store.setHoveredPhase(null)
+}
 
 function addLeakageCurrent() {
   store.addLeakageCurrent({
@@ -44,11 +74,11 @@ function updateLeakageCurrent(id: string, updates: Partial<{ label: string; curr
   <div class="mb-3">
     <v-card
       class="leakage-currents-card modern-card"
-      :class="{ 'leakage-card-highlighted': isLeakageCurrentHovered }"
+      :class="{ 'leakage-card-highlighted': isLeakageGroupHighlighted }"
       elevation="1"
-      @mouseenter="store.setHoveredPhase(LEAKAGE_CURRENT_PHASE_ID)"
+      @mouseenter="onCardEnter"
       @mouseleave="store.setHoveredPhase(null)"
-      @click="store.togglePinnedPhase(LEAKAGE_CURRENT_PHASE_ID)"
+      @click="store.togglePinnedPhase(LEAKAGE_PHASE_ID)"
     >
       <v-card-title class="d-flex justify-space-between align-center pa-3 pb-2">
         <div class="d-flex align-center ga-2">
@@ -93,8 +123,10 @@ function updateLeakageCurrent(id: string, updates: Partial<{ label: string; curr
             v-for="leakage in leakageCurrents"
             :key="leakage.id"
             class="leakage-row"
-            @mouseenter="store.setHoveredPhase(LEAKAGE_CURRENT_PHASE_ID)"
-            @mouseleave="store.setHoveredPhase(null)"
+            :class="{ 'leakage-row-highlighted': sourceRowHighlighted(leakage.id) }"
+            @mouseenter="onSourceEnter(leakage.id)"
+            @mouseleave="onSourceLeave"
+            @click.stop="store.togglePinnedPhase(leakage.id)"
           >
 
             <NumericField
@@ -190,6 +222,10 @@ function updateLeakageCurrent(id: string, updates: Partial<{ label: string; curr
 
 .leakage-row:hover {
   background-color: rgba(0, 0, 0, 0.02);
+}
+
+.leakage-row-highlighted {
+  background-color: rgba(var(--v-theme-primary), 0.08);
 }
 
 .leakage-current-field,

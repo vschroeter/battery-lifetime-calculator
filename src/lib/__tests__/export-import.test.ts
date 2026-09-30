@@ -26,6 +26,8 @@ const labels: CsvLabels = {
   unitMilliampHours: 'mAh',
   unitPercent: '%',
   unitPercentPerMonth: '%/month',
+  leakageGroup: 'Leakage Currents',
+  leakageSource: 'Leakage {n}',
 }
 
 const battery: BatteryConfig = {
@@ -85,6 +87,34 @@ describe('buildResultsCsv', () => {
   it('escapes quotes and neutralizes formula names', () => {
     expect(csv).toContain('"Say ""hi"""')
     expect(csv).toContain(`"'=2+2"`)
+  })
+
+  it('lists the leakage total and then each source, without a second copy of a single source', () => {
+    const several = calculate(battery, phases, [
+      { id: 'ldo', label: 'LDO', current: 1, currentUnit: 'µA' },
+      { id: 'blank', label: '  ', current: 0, currentUnit: 'µA' },
+    ])
+    const csv = buildResultsCsv(several, battery, labels)
+    const parentAt = csv.indexOf('"Leakage Currents","24 µAh/day","N/A","24 h"')
+    const namedAt = csv.indexOf('"LDO","24 µAh/day","",""')
+    const blankAt = csv.indexOf('"Leakage 2","0 nAh/day","",""')
+
+    expect(parentAt).toBeGreaterThan(-1)
+    expect(namedAt).toBeGreaterThan(parentAt)
+    expect(blankAt).toBeGreaterThan(namedAt)
+
+    const one = calculate(battery, phases, [
+      { id: 'ldo', label: 'LDO', current: 1, currentUnit: 'µA' },
+    ])
+    const oneCsv = buildResultsCsv(one, battery, labels)
+    expect(oneCsv).toContain('"LDO","24 µAh/day","N/A","24 h"')
+    expect(oneCsv.match(/"LDO"/g)).toHaveLength(1)
+
+    const silent = calculate(battery, phases, [
+      { id: 'ldo', label: 'LDO', current: 0, currentUnit: 'µA' },
+    ])
+    expect(buildResultsCsv(silent, battery, labels)).not.toContain('Leakage')
+    expect(buildResultsCsv(silent, battery, labels)).not.toContain('LDO')
   })
 })
 

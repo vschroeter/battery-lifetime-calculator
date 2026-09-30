@@ -33,12 +33,24 @@ export interface CalculatorState {
   leakageCurrents: LeakageCurrent[]
 }
 
+/** One entered leakage source. Present on the leakage total, and not a separate share of the day. */
+export interface LeakageSourceResult {
+  id: string
+  label: string
+  mAhPerDay: number
+}
+
 export interface PhaseResult {
   phaseId: string
   phaseName: string
   mAhPerDay: number
   eventsPerDay: number
   activeTimePerDaySeconds: number
+  /**
+   * Entered leakage sources, in editor order, including a source at 0.
+   * Only the parent `mAhPerDay` is part of the daily total.
+   */
+  leakageSources?: LeakageSourceResult[]
 }
 
 export interface CalculationResult {

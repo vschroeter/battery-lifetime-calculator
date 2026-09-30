@@ -3,6 +3,7 @@
  */
 
 import * as d3 from 'd3'
+import { LEAKAGE_PHASE_ID } from '@/lib/leakage'
 
 export const DEEP_SLEEP_COLOR = '#9e9e9e'
 export const SELF_DISCHARGE_COLOR = '#ff9800'
@@ -58,7 +59,7 @@ export function getColorForPhaseId(
   }
 
   // Check if this is a leakage current virtual phase
-  if (phaseId === 'leakage-currents-virtual') {
+  if (phaseId === LEAKAGE_PHASE_ID) {
     return LEAKAGE_CURRENT_COLOR
   }
 

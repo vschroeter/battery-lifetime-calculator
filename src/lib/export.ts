@@ -1,4 +1,5 @@
-import type { BatteryConfig, CalculationResult, CalculatorState } from '@/types/calculator'
+import { leakageAggregateName, leakageSourceName, LEAKAGE_PHASE_ID } from '@/lib/leakage'
+import type { BatteryConfig, CalculationResult, CalculatorState, PhaseResult } from '@/types/calculator'
 import {
   formatActiveTime,
   formatChargePerDay,
@@ -31,6 +32,8 @@ export interface CsvLabels {
   unitMilliampHours: string
   unitPercent: string
   unitPercentPerMonth: string
+  leakageGroup: string
+  leakageSource: string
 }
 
 function downloadText(contents: string, filename: string, mimeType: string): void {
@@ -77,6 +80,67 @@ function csvCell(value: string, asText = false): string {
 
 function csvRow(cells: string[], textColumns: ReadonlySet<number> = new Set()): string {
   return cells.map((cell, index) => csvCell(cell, textColumns.has(index))).join(',')
+}
+
+function chargeCell(mAhPerDay: number): string {
+  const charge = formatChargePerDay(mAhPerDay)
+  return `${charge.text} ${charge.unit}`
+}
+
+function phaseActivityCells(phaseResult: PhaseResult, labels: CsvLabels): [string, string] {
+  const activeTime = phaseResult.activeTimePerDaySeconds > 0
+    ? formatQuantity(formatActiveTime(phaseResult.activeTimePerDaySeconds))
+    : labels.auto
+  const events = phaseResult.eventsPerDay > 0
+    ? formatCount(phaseResult.eventsPerDay)
+    : labels.notAvailable
+  return [events, activeTime]
+}
+
+/**
+ * The leakage total, then each source. A single source is one row.
+ * Source rows leave events and active time empty so they read as parts of the total.
+ */
+function phaseCsvRows(
+  phaseResult: PhaseResult,
+  labels: CsvLabels,
+  textFirstColumn: ReadonlySet<number>,
+): string[] {
+  const nameLabels = { group: labels.leakageGroup, source: labels.leakageSource }
+  const sources = phaseResult.leakageSources
+  if (phaseResult.phaseId === LEAKAGE_PHASE_ID && sources && sources.length > 1) {
+    const [events, activeTime] = phaseActivityCells(phaseResult, labels)
+    const rows = [
+      csvRow([
+        leakageAggregateName(sources, nameLabels),
+        chargeCell(phaseResult.mAhPerDay),
+        events,
+        activeTime,
+      ], textFirstColumn),
+    ]
+    sources.forEach((source, index) => {
+      rows.push(csvRow([
+        leakageSourceName(source.label, index + 1, nameLabels),
+        chargeCell(source.mAhPerDay),
+        '',
+        '',
+      ], textFirstColumn))
+    })
+    return rows
+  }
+
+  const name = phaseResult.phaseId === LEAKAGE_PHASE_ID && sources
+    ? leakageAggregateName(sources, nameLabels)
+    : phaseResult.phaseName
+  const [events, activeTime] = phaseActivityCells(phaseResult, labels)
+  return [
+    csvRow([
+      name,
+      chargeCell(phaseResult.mAhPerDay),
+      events,
+      activeTime,
+    ], textFirstColumn),
+  ]
 }
 
 /**
@@ -147,16 +211,7 @@ export function buildResultsCsv(
   ], textFirstColumn))
 
   for (const phaseResult of result.phaseResults) {
-    const charge = formatChargePerDay(phaseResult.mAhPerDay)
-    const activeTime = phaseResult.activeTimePerDaySeconds > 0
-      ? formatQuantity(formatActiveTime(phaseResult.activeTimePerDaySeconds))
-      : labels.auto
-    rows.push(csvRow([
-      phaseResult.phaseName,
-      `${charge.text} ${charge.unit}`,
-      phaseResult.eventsPerDay > 0 ? formatCount(phaseResult.eventsPerDay) : labels.notAvailable,
-      activeTime,
-    ], textFirstColumn))
+    rows.push(...phaseCsvRows(phaseResult, labels, textFirstColumn))
   }
 
   return `\uFEFF${rows.join('\n')}`

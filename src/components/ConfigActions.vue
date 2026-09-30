@@ -64,6 +64,8 @@ function csvLabels(): CsvLabels {
     unitMilliampHours: 'mAh',
     unitPercent: '%',
     unitPercentPerMonth: i18n.t('percentPerMonth'),
+    leakageGroup: i18n.t('leakageCurrents'),
+    leakageSource: i18n.t('leakageSourceNumber'),
   }
 }
 

@@ -43,6 +43,38 @@ describe('calculate leakage and self-discharge', () => {
     expect(leakage).toBeDefined()
     expect(leakage!.mAhPerDay).toBeCloseTo((20 / 1_000_000) * 24, 12)
     expect(leakage!.mAhPerDay).toBeLessThan(0.001)
+    expect(leakage!.leakageSources).toEqual([
+      {
+        id: 'probe',
+        label: 'probe',
+        mAhPerDay: leakage!.mAhPerDay,
+      },
+    ])
+  })
+
+  it('keeps every source on the leakage total and leaves them out of the daily sum', () => {
+    const result = calculate(battery, phases, [
+      { id: 'ldo', label: 'LDO', current: 1, currentUnit: 'mA' },
+      { id: 'off', label: '', current: 0, currentUnit: 'µA' },
+    ])
+
+    const leakage = result.phaseResults.find((phase) => phase.phaseId === 'leakage-currents-virtual')
+    expect(leakage!.mAhPerDay).toBeCloseTo(24, 6)
+    expect(leakage!.leakageSources).toEqual([
+      { id: 'ldo', label: 'LDO', mAhPerDay: 24 },
+      { id: 'off', label: '', mAhPerDay: 0 },
+    ])
+    expect(result.phaseResults.map((row) => row.phaseId)).not.toContain('ldo')
+    const summed = result.phaseResults.reduce((sum, row) => sum + row.mAhPerDay, 0)
+    expect(result.totalmAhPerDay).toBeCloseTo(summed, 9)
+  })
+
+  it('omits leakage when every source is 0', () => {
+    const result = calculate(battery, phases, [
+      { id: 'off', label: 'LDO', current: 0, currentUnit: 'µA' },
+    ])
+
+    expect(result.phaseResults.some((row) => row.phaseId === 'leakage-currents-virtual')).toBe(false)
   })
 
   it('keeps a self-discharge contribution below 0.001 mAh/day', () => {
